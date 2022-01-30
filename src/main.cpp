@@ -33,8 +33,8 @@ constexpr float LEFTFLOOR = -RIGHTFLOOR;
 
 constexpr float FLOORCOLOR = 0.17f;
 constexpr float WALLCOLOR = 0.30f;
-constexpr float PLAYERCOLORR = 0.30f;
-constexpr float PLAYERCOLORG = 0.30f;
+constexpr float PLAYERCOLORR = 1.0f;
+constexpr float PLAYERCOLORG = 1.0f;
 constexpr float PLAYERCOLORB = 0.0f;
 
 constexpr float UPWALL = 0.35f;
@@ -87,6 +87,30 @@ bool isFree(glm::vec3 p, float d)
 
     std::cout << p.x << " " << p.y << " " << p.z << std::endl;
     return true;
+}
+
+bool isColidingWithMainWalls(glm::vec3 p, float d)
+{
+    if (p.x + d >= RIGHTWALL || p.x - d <= LEFTWALL)
+        return true;
+    if (p.y + d >= UPWALL || p.y - d <= DOWNWALL)
+        return true;
+    return false;
+}
+
+bool isCollidingWithObstacle(glm::vec3 p, float d)
+{
+    for (int i = 0; i < upObstacles.size(); ++i)
+        if (p.y + PLAYERSIZE >= downObstacles[i] && p.y + PLAYERSIZE <= upObstacles[i] && playerPos.x + PLAYERSIZE >= leftObstacles[i] && playerPos.x - PLAYERSIZE <= rightObstacles[i])
+            return true;
+        else if (p.y - PLAYERSIZE <= upObstacles[i] && p.y + PLAYERSIZE >= downObstacles[i] && playerPos.x + PLAYERSIZE >= leftObstacles[i] && playerPos.x - PLAYERSIZE <= rightObstacles[i] )
+            return true;
+        else if (p.x - PLAYERSIZE <= rightObstacles[i] && p.x - PLAYERSIZE >= leftObstacles[i] && playerPos.y + PLAYERSIZE >= downObstacles[i] && playerPos.y - PLAYERSIZE <= upObstacles[i])
+            return true;
+        else if (p.x + PLAYERSIZE >= leftObstacles[i] && p.x + PLAYERSIZE <= rightObstacles[i] && playerPos.y + PLAYERSIZE >= downObstacles[i] && playerPos.y - PLAYERSIZE <= upObstacles[i])
+            return true;
+
+    return false;
 }
 
 std::vector<float> generateObstacles(int n)
@@ -409,16 +433,17 @@ void processInput(GLFWwindow *window)
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
     {
         tempPos = speed * glm::vec3(0.0f, 1.0f, 0.0f);
-        isMoving = true;
+        //isMoving = true;
 
-        for (int i = 0; i < upObstacles.size(); ++i)
-            if ((playerPos + tempPos).y + PLAYERSIZE >= downObstacles[i] && (playerPos + tempPos).y + PLAYERSIZE <= upObstacles[i] && playerPos.x + PLAYERSIZE >= leftObstacles[i] && playerPos.x - PLAYERSIZE <= rightObstacles[i])
-            {
-                isMoving = false;
-                break;
-            }
+        //for (int i = 0; i < upObstacles.size(); ++i)
+            //if ((playerPos + tempPos).y + PLAYERSIZE >= downObstacles[i] && (playerPos + tempPos).y + PLAYERSIZE <= upObstacles[i] && playerPos.x + PLAYERSIZE >= leftObstacles[i] && playerPos.x - PLAYERSIZE <= rightObstacles[i])
+            //{
+                //isMoving = false;
+                //break;
+            //}
 
-        if (isMoving)
+        //if (isMoving && !isColidingWithMainWalls(playerPos + tempPos, PLAYERSIZE))
+        if (!isCollidingWithObstacle(playerPos + tempPos, PLAYERSIZE) && !isColidingWithMainWalls(playerPos + tempPos, PLAYERSIZE))
             playerPos += tempPos, model = glm::translate(model, tempPos);
     }
 
@@ -435,7 +460,7 @@ void processInput(GLFWwindow *window)
                 break;
             }
 
-        if (isMoving)
+        if (isMoving && !isColidingWithMainWalls(playerPos + tempPos, PLAYERSIZE))
             playerPos += tempPos, model = glm::translate(model, tempPos);
     }
 
@@ -451,7 +476,7 @@ void processInput(GLFWwindow *window)
                 break;
             }
 
-        if (isMoving)
+        if (isMoving && !isColidingWithMainWalls(playerPos + tempPos, PLAYERSIZE))
             playerPos += tempPos, model = glm::translate(model, tempPos);
     }
 
@@ -467,7 +492,7 @@ void processInput(GLFWwindow *window)
                 break;
             }
 
-        if (isMoving)
+        if (isMoving && !isColidingWithMainWalls(playerPos + tempPos, PLAYERSIZE))
             playerPos += tempPos, model = glm::translate(model, tempPos);
     }
 }
