@@ -14,6 +14,12 @@
 # define radius 1.0f
 #define PI 3.141592653589793
 
+enum class Direction {
+    UP,
+    DOWN,
+    LEFT,
+    RIGHT
+};
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void processInput(GLFWwindow *window);
@@ -37,12 +43,23 @@ constexpr float PLAYERCOLORR = 1.0f;
 constexpr float PLAYERCOLORG = 1.0f;
 constexpr float PLAYERCOLORB = 0.0f;
 
+constexpr float ENEMYCOLORR = 0.0f;
+constexpr float ENEMYCOLORG = 0.0f;
+constexpr float ENEMYCOLORB = 1.0f;
+
 constexpr float UPWALL = 0.35f;
 constexpr float DOWNWALL = -UPWALL;
 constexpr float RIGHTWALL = 0.75f;
 constexpr float LEFTWALL = -RIGHTWALL;
 constexpr float WALLSIZE = 0.02f;
 constexpr float PLAYERSIZE = 0.03f;
+constexpr float ENEMYSIZE = 0.02f;
+
+constexpr int ENEMYCOUNT = 5;
+constexpr int WALLCOUNT = 4;
+
+std::random_device rand_dev;
+std::mt19937 gen(rand_dev());
 
 glm::vec3 playerPos;
 
@@ -51,8 +68,144 @@ std::vector<float> downObstacles;
 std::vector<float> leftObstacles;
 std::vector<float> rightObstacles;
 
-std::random_device rand_dev;
-std::mt19937 gen(rand_dev());
+std::vector<float> upEnemies;
+std::vector<float> downEnemies;
+std::vector<float> leftEnemies;
+std::vector<float> rightEnemies;
+
+
+bool isCollidingWithObstacle(glm::vec3 p, float d)
+{
+    for (int i = 0; i < upObstacles.size(); ++i)
+        if (p.y + d >= downObstacles[i] && p.y + d <= upObstacles[i] && p.x + d >= leftObstacles[i] && p.x - d <= rightObstacles[i])
+            return true;
+        else if (p.y - d <= upObstacles[i] && p.y + d >= downObstacles[i] && p.x + d >= leftObstacles[i] && p.x - d <= rightObstacles[i] )
+            return true;
+        else if (p.x - d <= rightObstacles[i] && p.x - d >= leftObstacles[i] && p.y + d >= downObstacles[i] && p.y - d <= upObstacles[i])
+            return true;
+        else if (p.x + d >= leftObstacles[i] && p.x + d <= rightObstacles[i] && p.y + d >= downObstacles[i] && p.y - d <= upObstacles[i])
+            return true;
+
+    return false;
+}
+
+bool isColidingWithMainWalls(glm::vec3 p, float d)
+{
+    if (p.x + d >= RIGHTWALL || p.x - d <= LEFTWALL)
+        return true;
+    if (p.y + d >= UPWALL || p.y - d <= DOWNWALL)
+        return true;
+    return false;
+}
+
+bool isColliding(glm::vec3 p, float d)
+{
+    if (isColidingWithMainWalls(p, d))
+        return true;
+    if (isCollidingWithObstacle(p, d))
+        return true;
+
+    return false;
+}
+
+struct Enemy
+{
+    glm::mat4 model = glm::mat4(1.0f);
+    glm::vec3 enemyPos;
+    float speed = 0.5f;
+
+	unsigned int VBO, VAO;
+    Direction dir;
+
+    Enemy(glm::vec3 enemyPos, Direction(dir)) :
+        enemyPos(enemyPos), dir(dir) { }
+
+    void moveEnemy();
+};
+
+void Enemy::moveEnemy()
+{
+    static std::uniform_real_distribution<float> direction(0.0f, 1.0f);
+
+    bool moved = false;
+
+    int ct = 0;
+    if (!moved)
+    {
+        float direc = direction(gen);
+        if (!ct)
+        {
+            if (direc < 0.96f);
+            else if (direc < 0.97f)
+                dir = Direction::UP;
+            else if (direc < 0.98f)
+                dir = Direction::DOWN;
+            else if (direc < 0.99f)
+                dir = Direction::LEFT;
+            else
+                dir = Direction::RIGHT;
+        }
+        else
+        {
+            if (direc < 0.25f)
+                dir = Direction::UP;
+            else if (direc < 0.5f)
+                dir = Direction::DOWN;
+            else if (direc < 0.75f)
+                dir = Direction::LEFT;
+            else
+                dir = Direction::RIGHT;
+        }
+
+        ct++;
+
+        glm::vec3 tempPos;
+        switch (dir)
+        {
+        case Direction::UP:
+            tempPos = glm::vec3(0.0f, speed * deltaTime, 0.0);
+
+            if (!isColliding(enemyPos + tempPos, ENEMYSIZE))
+            {
+                this->model = glm::translate(this->model, tempPos);
+                enemyPos += tempPos;
+                moved = true;
+            }
+            break;
+        case Direction::DOWN:
+            tempPos = glm::vec3(0.0f, -speed * deltaTime, 0.0);
+
+            if (!isColliding(enemyPos + tempPos, ENEMYSIZE))
+            {
+                this->model = glm::translate(this->model, tempPos);
+                enemyPos += tempPos;
+                moved = true;
+            }
+            break;
+        case Direction::LEFT:
+            tempPos = glm::vec3(-speed * deltaTime, 0.0f, 0.0);
+
+            if (!isColliding(enemyPos + tempPos, ENEMYSIZE))
+            {
+                this->model = glm::translate(this->model, tempPos);
+                enemyPos += tempPos;
+                moved = true;
+            }
+            break;
+        case Direction::RIGHT:
+            tempPos = glm::vec3(speed * deltaTime, 0.0f, 0.0);
+
+            if (!isColliding(enemyPos + tempPos, ENEMYSIZE))
+            {
+                this->model = glm::translate(this->model, tempPos);
+                enemyPos += tempPos;
+                moved = true;
+            }
+            break;
+        }
+    }
+}
+
 
 glm::vec3 pos(float d)
 {
@@ -71,59 +224,32 @@ glm::vec3 color()
     return glm::vec3(r(gen), g(gen), b(gen));
 }
 
-bool isFree(glm::vec3 p, float d)
+bool isCollidingWithEnemies(glm::vec3 p, float d)
 {
-    for (int i = 0; i < upObstacles.size(); ++i)
-        if (p.y + d <= upObstacles[i] && p.y + d >= downObstacles[i])
-            return false;
-        else if (p.y - d <= upObstacles[i] && p.y + d >= downObstacles[i])
-            return false;
-
-    for (int i = 0; i < rightObstacles.size(); ++i)
-        if (p.x + d <= rightObstacles[i] && p.x + d >= leftObstacles[i])
-            return false;
-        else if (p.x + d <= rightObstacles[i] && p.x - d >= leftObstacles[i])
-            return false;
-
-    std::cout << p.x << " " << p.y << " " << p.z << std::endl;
-    return true;
-}
-
-bool isColidingWithMainWalls(glm::vec3 p, float d)
-{
-    if (p.x + d >= RIGHTWALL || p.x - d <= LEFTWALL)
-        return true;
-    if (p.y + d >= UPWALL || p.y - d <= DOWNWALL)
-        return true;
-    return false;
-}
-
-bool isCollidingWithObstacle(glm::vec3 p, float d)
-{
-    for (int i = 0; i < upObstacles.size(); ++i)
-        if (p.y + PLAYERSIZE >= downObstacles[i] && p.y + PLAYERSIZE <= upObstacles[i] && playerPos.x + PLAYERSIZE >= leftObstacles[i] && playerPos.x - PLAYERSIZE <= rightObstacles[i])
+    for (int i = 0; i < upEnemies.size(); ++i)
+        if (p.y + d >= downEnemies[i] && p.y + d <= upEnemies[i] && playerPos.x + d >= leftEnemies[i] && playerPos.x - d <= rightEnemies[i])
             return true;
-        else if (p.y - PLAYERSIZE <= upObstacles[i] && p.y + PLAYERSIZE >= downObstacles[i] && playerPos.x + PLAYERSIZE >= leftObstacles[i] && playerPos.x - PLAYERSIZE <= rightObstacles[i] )
+        else if (p.y - d <= upEnemies[i] && p.y + d >= downEnemies[i] && playerPos.x + d >= leftEnemies[i] && playerPos.x - d <= rightEnemies[i] )
             return true;
-        else if (p.x - PLAYERSIZE <= rightObstacles[i] && p.x - PLAYERSIZE >= leftObstacles[i] && playerPos.y + PLAYERSIZE >= downObstacles[i] && playerPos.y - PLAYERSIZE <= upObstacles[i])
+        else if (p.x - d <= rightEnemies[i] && p.x - d >= leftEnemies[i] && playerPos.y + d >= downEnemies[i] && playerPos.y - d <= upEnemies[i])
             return true;
-        else if (p.x + PLAYERSIZE >= leftObstacles[i] && p.x + PLAYERSIZE <= rightObstacles[i] && playerPos.y + PLAYERSIZE >= downObstacles[i] && playerPos.y - PLAYERSIZE <= upObstacles[i])
+        else if (p.x + d >= leftEnemies[i] && p.x + d <= rightEnemies[i] && playerPos.y + d >= downEnemies[i] && playerPos.y - d <= upEnemies[i])
             return true;
 
     return false;
 }
 
-std::vector<float> generateObstacles(int n)
+std::vector<float> generateObstacles()
 {
     std::vector<float> obstacles;
-    for (int i = 0; i < n; i++)
+    auto c = color();
+
+    for (int i = 0; i < WALLCOUNT; ++i)
     {
         auto p = pos(WALLSIZE);
         float d = WALLSIZE;
 
-        auto c = color();
-
-        while (!isFree(p, d))
+        while (isCollidingWithObstacle(p, d))
             p = pos(WALLSIZE);
 
         obstacles.push_back(p.x + d);
@@ -183,6 +309,75 @@ std::vector<float> generateObstacles(int n)
     return obstacles;
 }
 
+std::vector<Enemy> generateEnemies()
+{
+    std::vector<Enemy> enemies;
+    auto c = color();
+    for (int i = 0; i < ENEMYCOUNT; ++i)
+    {
+        auto p = pos(ENEMYSIZE);
+        float d = ENEMYSIZE;
+
+        while (isCollidingWithObstacle(p, d) && isCollidingWithEnemies(p, d))
+            p = pos(ENEMYSIZE);
+
+        float arr[] = {
+            p.x + d, p.y, Z, ENEMYCOLORR, ENEMYCOLORG, ENEMYCOLORB,
+            p.x - d, p.y, Z, ENEMYCOLORR, ENEMYCOLORG, ENEMYCOLORB,
+            p.x, p.y + d, Z, ENEMYCOLORR, ENEMYCOLORG, ENEMYCOLORB,
+
+            p.x + d, p.y, Z, ENEMYCOLORR, ENEMYCOLORG, ENEMYCOLORB,
+            p.x - d, p.y, Z, ENEMYCOLORR, ENEMYCOLORG, ENEMYCOLORB,
+            p.x, p.y - d, Z, ENEMYCOLORR, ENEMYCOLORG, ENEMYCOLORB
+        };
+
+        upEnemies.push_back(p.y + d);
+        downEnemies.push_back(p.y - d);
+        leftEnemies.push_back(p.x - d);
+        rightEnemies.push_back(p.x + d);
+
+        static std::uniform_int_distribution<int> direction(0, 4);
+        int direc = direction(gen) % 4;
+        Direction dir;
+
+        switch (direc)
+        {
+        case 0:
+            dir = Direction::UP;
+            break;
+        case 1:
+            dir = Direction::DOWN;
+            break;
+        case 2:
+            dir = Direction::LEFT;
+            break;
+        case 3:
+            dir = Direction::RIGHT;
+            break;
+        }
+
+        Enemy enemy(glm::vec3(p.x, p.y, Z), dir);
+
+        glGenVertexArrays(1, &enemy.VAO);
+        glGenBuffers(1, &enemy.VBO);
+
+        glBindVertexArray(enemy.VAO);
+        glBindBuffer(GL_ARRAY_BUFFER, enemy.VBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(arr), arr, GL_STATIC_DRAW);
+
+        // Position attribute
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(0);
+
+        // Color attribute
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3*sizeof(float)));
+        glEnableVertexAttribArray(1);
+
+        enemies.push_back(enemy);
+    }
+    return enemies;
+}
+
 int main(int argc, char *argv[])
 {
 
@@ -197,7 +392,7 @@ int main(int argc, char *argv[])
 #endif
 
 	// glfw window creation
-	GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Hello Triangle", NULL, NULL);
+	GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "2D Game", NULL, NULL);
 	if (window == NULL) {
 		std::cout << "Failed to create GLFW window" << std::endl;
 		glfwTerminate();
@@ -267,19 +462,17 @@ int main(int argc, char *argv[])
         RIGHTFLOOR, UPFLOOR, Z, WALLCOLOR, WALLCOLOR, WALLCOLOR
     };
 
-    auto obstacles = generateObstacles(5);
+    auto obstacles = generateObstacles();
     float obstacleArray[obstacles.size()];
 
     for (int i = 0; i < obstacles.size(); i++)
         obstacleArray[i] = obstacles[i];
 
     auto p = pos(PLAYERSIZE);
-    while (!isFree(p, PLAYERSIZE))
+    while (isCollidingWithObstacle(p, PLAYERSIZE) || isCollidingWithEnemies(p, PLAYERSIZE * 5))
         p = pos(PLAYERSIZE);
 
     playerPos = p;
-
-    std::cout << "Player position: " << p.x << ", " << p.y << std::endl;
 
     float character[] = {
         p.x + PLAYERSIZE, p.y, Z, PLAYERCOLORR, PLAYERCOLORG, PLAYERCOLORB,
@@ -294,6 +487,8 @@ int main(int argc, char *argv[])
 	unsigned int VBO, VAO, wallVAO, wallVBO;
     unsigned characterVAO, characterVBO;
     unsigned obstacleVAO, obstacleVBO;
+
+    auto enemies = generateEnemies();
 
     glGenVertexArrays(1, &VAO);
     glGenVertexArrays(1, &wallVAO);
@@ -378,6 +573,14 @@ int main(int argc, char *argv[])
         //unsigned int modelLoc;
         //glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(glm::mat4(1)));
 
+        for (auto& enemy: enemies)
+        {
+            enemy.moveEnemy();
+            ourShader.setMat4("model", enemy.model);
+            glBindVertexArray(enemy.VAO);
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+        }
+
         ourShader.setMat4("model", glm::mat4(1));
 
         glBindVertexArray(obstacleVAO);
@@ -433,66 +636,32 @@ void processInput(GLFWwindow *window)
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
     {
         tempPos = speed * glm::vec3(0.0f, 1.0f, 0.0f);
-        //isMoving = true;
 
-        //for (int i = 0; i < upObstacles.size(); ++i)
-            //if ((playerPos + tempPos).y + PLAYERSIZE >= downObstacles[i] && (playerPos + tempPos).y + PLAYERSIZE <= upObstacles[i] && playerPos.x + PLAYERSIZE >= leftObstacles[i] && playerPos.x - PLAYERSIZE <= rightObstacles[i])
-            //{
-                //isMoving = false;
-                //break;
-            //}
-
-        //if (isMoving && !isColidingWithMainWalls(playerPos + tempPos, PLAYERSIZE))
-        if (!isCollidingWithObstacle(playerPos + tempPos, PLAYERSIZE) && !isColidingWithMainWalls(playerPos + tempPos, PLAYERSIZE))
+        if (!isColliding(playerPos + tempPos, PLAYERSIZE))
             playerPos += tempPos, model = glm::translate(model, tempPos);
     }
 
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
     {
         tempPos = speed * glm::vec3(0.0f, -1.0f, Z);
-        isMoving = true;
 
-
-        for (int i = 0; i < downObstacles.size(); ++i)
-            if ((playerPos + tempPos).y - PLAYERSIZE <= upObstacles[i] && (playerPos + tempPos).y + PLAYERSIZE >= downObstacles[i] && playerPos.x + PLAYERSIZE >= leftObstacles[i] && playerPos.x - PLAYERSIZE <= rightObstacles[i] )
-            {
-                isMoving = false;
-                break;
-            }
-
-        if (isMoving && !isColidingWithMainWalls(playerPos + tempPos, PLAYERSIZE))
+        if (!isColliding(playerPos + tempPos, PLAYERSIZE))
             playerPos += tempPos, model = glm::translate(model, tempPos);
     }
 
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
     {
         tempPos = speed * glm::vec3(-1.0f, 0.0f, Z);
-        isMoving = true;
 
-        for (int i = 0; i < leftObstacles.size(); ++i)
-            if ((playerPos + tempPos).x - PLAYERSIZE <= rightObstacles[i] && (playerPos + tempPos).x - PLAYERSIZE >= leftObstacles[i] && playerPos.y + PLAYERSIZE >= downObstacles[i] && playerPos.y - PLAYERSIZE <= upObstacles[i])
-            {
-                isMoving = false;
-                break;
-            }
-
-        if (isMoving && !isColidingWithMainWalls(playerPos + tempPos, PLAYERSIZE))
+        if (!isColliding(playerPos + tempPos, PLAYERSIZE))
             playerPos += tempPos, model = glm::translate(model, tempPos);
     }
 
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
     {
         tempPos = speed * glm::vec3(1.0f, 0.0f, Z);
-        isMoving = true;
 
-        for (int i = 0; i < rightObstacles.size(); ++i)
-            if ((playerPos + tempPos).x + PLAYERSIZE >= leftObstacles[i] && (playerPos + tempPos).x + PLAYERSIZE <= rightObstacles[i] && playerPos.y + PLAYERSIZE >= downObstacles[i] && playerPos.y - PLAYERSIZE <= upObstacles[i])
-            {
-                isMoving = false;
-                break;
-            }
-
-        if (isMoving && !isColidingWithMainWalls(playerPos + tempPos, PLAYERSIZE))
+        if (!isColliding(playerPos + tempPos, PLAYERSIZE))
             playerPos += tempPos, model = glm::translate(model, tempPos);
     }
 }
