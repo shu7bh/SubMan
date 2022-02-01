@@ -28,13 +28,13 @@ float deltaTime = 0.0f;	// time between current frame and last frame
 float lastFrame = 0.0f;
 glm::mat4 model = glm::mat4(1);
 // settings
-const unsigned int SCR_WIDTH = 1000;
-const unsigned int SCR_HEIGHT = 1400;
+const unsigned int SCR_WIDTH = 1080;
+const unsigned int SCR_HEIGHT = 1080;
 
 constexpr float Z = 0.0f;
-constexpr float UPFLOOR = 0.4f;
+constexpr float UPFLOOR = 0.6f;
 constexpr float DOWNFLOOR = -UPFLOOR;
-constexpr float RIGHTFLOOR = 0.8f;
+constexpr float RIGHTFLOOR = 1.0f;
 constexpr float LEFTFLOOR = -RIGHTFLOOR;
 
 constexpr float FLOORCOLOR = 0.17f;
@@ -51,15 +51,19 @@ constexpr float COINCOLORR = 0.0f;
 constexpr float COINCOLORG = 1.0f;
 constexpr float COINCOLORB = 1.0f;
 
-constexpr float UPWALL = 0.35f;
+constexpr float DOORCOLORR = 1.0f;
+constexpr float DOORCOLORG = 1.0f;
+constexpr float DOORCOLORB = 0.5f;
+
+constexpr float UPWALL = 0.55f;
 constexpr float DOWNWALL = -UPWALL;
-constexpr float RIGHTWALL = 0.75f;
+constexpr float RIGHTWALL = 0.95f;
 constexpr float LEFTWALL = -RIGHTWALL;
 constexpr float WALLSIZE = 0.02f;
 constexpr float PLAYERSIZE = 0.02f;
 constexpr float ENEMYSIZE = 0.02f;
 constexpr float COINSIZE = 0.015f;
-constexpr float DOORSIZE = 0.2f;
+constexpr float DOORSIZE = 0.08f;
 
 constexpr int ENEMYCOUNT = 5;
 constexpr int WALLCOUNT = 4;
@@ -75,6 +79,7 @@ std::random_device rand_dev;
 std::mt19937 gen(rand_dev());
 
 glm::vec3 playerPos;
+float doorPos;
 
 std::vector<float> upObstacles;
 std::vector<float> downObstacles;
@@ -102,9 +107,7 @@ bool isCollidingWithObstacles(glm::vec3 p, float d)
 
 bool isColidingWithMainWalls(glm::vec3 p, float d)
 {
-    if (p.x + d >= RIGHTWALL || p.x - d <= LEFTWALL)
-        return true;
-    if (p.y + d >= UPWALL || p.y - d <= DOWNWALL)
+    if (p.x + d > RIGHTWALL || p.x - d < LEFTWALL || p.y + d > UPWALL || p.y - d < DOWNWALL)
         return true;
     return false;
 }
@@ -557,6 +560,19 @@ int main(int argc, char *argv[])
     while (isCollidingWithObstacles(p, PLAYERSIZE) || isCollidingWithEnemies(p, PLAYERSIZE * 5) || isCollidingWithCoins(p, PLAYERSIZE * 2))
         p = pos(PLAYERSIZE);
 
+    doorPos = pos(DOORSIZE).x;
+
+    float doorArray[] = {
+        // Door
+        doorPos + DOORSIZE, UPFLOOR, Z, DOORCOLORR, DOORCOLORG, DOORCOLORB,
+        doorPos - DOORSIZE, UPFLOOR, Z, DOORCOLORR, DOORCOLORG, DOORCOLORB,
+        doorPos + DOORSIZE, UPWALL, Z, DOORCOLORR, DOORCOLORG, DOORCOLORB,
+
+        doorPos - DOORSIZE, UPWALL, Z, DOORCOLORR, DOORCOLORG, DOORCOLORB,
+        doorPos - DOORSIZE, UPFLOOR, Z, DOORCOLORR, DOORCOLORG, DOORCOLORB,
+        doorPos + DOORSIZE, UPWALL, Z, DOORCOLORR, DOORCOLORG, DOORCOLORB
+    };
+
     playerPos = p;
 
     float character[] = {
@@ -572,16 +588,19 @@ int main(int argc, char *argv[])
 	unsigned int VBO, VAO, wallVAO, wallVBO;
     unsigned characterVAO, characterVBO;
     unsigned obstacleVAO, obstacleVBO;
+    unsigned doorVAO, doorVBO;
 
     glGenVertexArrays(1, &VAO);
     glGenVertexArrays(1, &wallVAO);
     glGenVertexArrays(1, &characterVAO);
     glGenVertexArrays(1, &obstacleVAO);
+    glGenVertexArrays(1, &doorVAO);
 
     glGenBuffers(1, &VBO);
     glGenBuffers(1, &wallVBO);
     glGenBuffers(1, &characterVBO);
     glGenBuffers(1, &obstacleVBO);
+    glGenBuffers(1, &doorVBO);
 
     glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
@@ -627,6 +646,15 @@ int main(int argc, char *argv[])
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
+    glBindVertexArray(doorVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, doorVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(doorArray), doorArray, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
 
 	// You can unbind the VAO afterwards so other VAO calls won't accidentally
 	// modify this VAO, but this rarely happens. Modifying other VAOs requires a
@@ -670,6 +698,16 @@ int main(int argc, char *argv[])
                 }
         }
 
+        if (!gameOver && coinsCollected == COINCOUNT)
+        {
+            if (playerPos.x - PLAYERSIZE <= doorPos + DOORSIZE && playerPos.x + PLAYERSIZE >= doorPos - DOORSIZE && playerPos.y + PLAYERSIZE >= UPWALL - PLAYERSIZE)
+            {
+                std::cout << "You Win!" << std::endl << "Score: " << coinsCollected * COINSCORE << std::endl;
+                gameOver = true;
+                pause = true;
+            }
+        }
+
 		// render
 		glClearColor(0.0, 0.0, 0.0, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -703,6 +741,9 @@ int main(int argc, char *argv[])
             glBindVertexArray(coin.VAO);
             glDrawArrays(GL_TRIANGLES, 0, 36);
         }
+
+        glBindVertexArray(doorVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
 
         glBindVertexArray(obstacleVAO);
         glDrawArrays(GL_TRIANGLES, 0, obstacles.size() / 6);
