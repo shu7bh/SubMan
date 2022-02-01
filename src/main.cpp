@@ -59,14 +59,14 @@ constexpr float UPWALL = 0.55f;
 constexpr float DOWNWALL = -UPWALL;
 constexpr float RIGHTWALL = 0.95f;
 constexpr float LEFTWALL = -RIGHTWALL;
-constexpr float WALLSIZE = 0.02f;
+constexpr float WALLSIZE = 0.025f;
 constexpr float PLAYERSIZE = 0.02f;
 constexpr float ENEMYSIZE = 0.02f;
 constexpr float COINSIZE = 0.015f;
 constexpr float DOORSIZE = 0.08f;
 
-constexpr int ENEMYCOUNT = 5;
-constexpr int WALLCOUNT = 4;
+constexpr int ENEMYCOUNT = 8;
+constexpr int WALLCOUNT = 20;
 constexpr int COINCOUNT = 5;
 
 constexpr int COINSCORE = 10;
@@ -112,6 +112,15 @@ bool isColidingWithMainWalls(glm::vec3 p, float d)
     return false;
 }
 
+bool isCollidingWithEnemies(glm::vec3 p, float d)
+{
+    for (int i = 0; i < upEnemies.size(); ++i)
+        if (p.y + d >= downEnemies[i] && p.y - d <= upEnemies[i] && p.x + d >= leftEnemies[i] && p.x - d <= rightEnemies[i])
+            return true;
+
+    return false;
+}
+
 bool isCollidingWithCoins(glm::vec3 p, float d)
 {
     for (int i = 0; i < upCoins.size(); ++i)
@@ -131,11 +140,27 @@ bool isColliding(glm::vec3 p, float d)
     return false;
 }
 
+bool isCollidingWithAll(glm::vec3 p, float d)
+{
+    if (isColliding(p, d) || isCollidingWithEnemies(p, d) || isCollidingWithCoins(p, d))
+        return true;
+    return false;
+}
+
+glm::vec3 pos(float d)
+{
+    std::uniform_real_distribution<float> x(LEFTWALL + d, RIGHTWALL - d);
+    std::uniform_real_distribution<float> y(DOWNWALL + d, UPWALL - d);
+
+    return glm::vec3(x(gen), y(gen), Z);
+}
+
+
 struct Enemy
 {
     glm::mat4 model = glm::mat4(1.0f);
     glm::vec3 enemyPos;
-    float speed = 0.5f;
+    float speed = 0.25f;
 
 	unsigned int VBO, VAO;
     Direction dir;
@@ -166,82 +191,33 @@ void Enemy::moveEnemy()
     while (!moved && !pause)
     {
         float direc = direction(gen);
-        if (!ct)
+        if (ct)
         {
-            if (direc < 0.96f);
-            else if (direc < 0.97f)
-                dir = Direction::UP;
-            else if (direc < 0.98f)
-                dir = Direction::DOWN;
-            else if (direc < 0.99f)
-                dir = Direction::LEFT;
-            else
-                dir = Direction::RIGHT;
+            glm::vec3 tempPos;
+            auto p = glm::normalize(pos(0));
+            tempPos = glm::vec3(speed * deltaTime * p);
+
+            if (!isColliding(enemyPos + tempPos, ENEMYSIZE)) {
+                this->model = glm::translate(this->model, tempPos);
+                enemyPos += tempPos;
+                moved = true;
+            }
+            break;
         }
         else
         {
-            Direction temp;
-            if (direc < 0.25f)
-                temp = Direction::UP;
-            else if (direc < 0.5f)
-                temp = Direction::DOWN;
-            else if (direc < 0.75f)
-                temp = Direction::LEFT;
-            else
-                temp = Direction::RIGHT;
+            auto p = playerPos - enemyPos;
+            p = glm::normalize(p);
+            auto tempPos = speed * deltaTime * p;
 
-            if (temp != dir)
-                dir = temp;
-            else
-                continue;
+            if (!isCollidingWithAll(enemyPos + tempPos, ENEMYSIZE))
+            {
+                this->model = glm::translate(this->model, tempPos);
+                enemyPos += tempPos;
+                moved = true;
+            }
         }
-
         ct++;
-
-        glm::vec3 tempPos;
-        switch (dir)
-        {
-        case Direction::UP:
-            tempPos = glm::vec3(0.0f, speed * deltaTime, 0.0);
-
-            if (!isColliding(enemyPos + tempPos, ENEMYSIZE))
-            {
-                this->model = glm::translate(this->model, tempPos);
-                enemyPos += tempPos;
-                moved = true;
-            }
-            break;
-        case Direction::DOWN:
-            tempPos = glm::vec3(0.0f, -speed * deltaTime, 0.0);
-
-            if (!isColliding(enemyPos + tempPos, ENEMYSIZE))
-            {
-                this->model = glm::translate(this->model, tempPos);
-                enemyPos += tempPos;
-                moved = true;
-            }
-            break;
-        case Direction::LEFT:
-            tempPos = glm::vec3(-speed * deltaTime, 0.0f, 0.0);
-
-            if (!isColliding(enemyPos + tempPos, ENEMYSIZE))
-            {
-                this->model = glm::translate(this->model, tempPos);
-                enemyPos += tempPos;
-                moved = true;
-            }
-            break;
-        case Direction::RIGHT:
-            tempPos = glm::vec3(speed * deltaTime, 0.0f, 0.0);
-
-            if (!isColliding(enemyPos + tempPos, ENEMYSIZE))
-            {
-                this->model = glm::translate(this->model, tempPos);
-                enemyPos += tempPos;
-                moved = true;
-            }
-            break;
-        }
     }
 
     upEnemies.push_back(enemyPos.y + ENEMYSIZE);
@@ -251,14 +227,6 @@ void Enemy::moveEnemy()
 }
 
 
-glm::vec3 pos(float d)
-{
-    std::uniform_real_distribution<float> x(LEFTWALL + d, RIGHTWALL - d);
-    std::uniform_real_distribution<float> y(DOWNWALL + d, UPWALL - d);
-
-    return glm::vec3(x(gen), y(gen), Z);
-}
-
 glm::vec3 color()
 {
     std::uniform_real_distribution<float> r(0.0f, 1.0f);
@@ -266,15 +234,6 @@ glm::vec3 color()
     std::uniform_real_distribution<float> b(0.0f, 1.0f);
 
     return glm::vec3(r(gen), g(gen), b(gen));
-}
-
-bool isCollidingWithEnemies(glm::vec3 p, float d)
-{
-    for (int i = 0; i < upEnemies.size(); ++i)
-        if (p.y + d >= downEnemies[i] && p.y - d <= upEnemies[i] && p.x + d >= leftEnemies[i] && p.x - d <= rightEnemies[i])
-            return true;
-
-    return false;
 }
 
 std::vector<float> generateObstacles()
@@ -557,7 +516,7 @@ int main(int argc, char *argv[])
     auto coins = generateCoins();
 
     auto p = pos(PLAYERSIZE);
-    while (isCollidingWithObstacles(p, PLAYERSIZE) || isCollidingWithEnemies(p, PLAYERSIZE * 5) || isCollidingWithCoins(p, PLAYERSIZE * 2))
+    while (isCollidingWithObstacles(p, PLAYERSIZE) || isCollidingWithEnemies(p, PLAYERSIZE * 9) || isCollidingWithCoins(p, PLAYERSIZE * 2))
         p = pos(PLAYERSIZE);
 
     doorPos = pos(DOORSIZE).x;
