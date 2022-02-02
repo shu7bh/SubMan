@@ -79,15 +79,19 @@ constexpr float ENEMYSIZE = 0.02f;
 constexpr float COINSIZE = 0.015f;
 constexpr float DOORSIZE = 0.08f;
 
+GameMode gm = GameMode::PAUSE;
+GameState gs = GameState::LEVEL1;
+
 int ENEMYCOUNT = 5;
 int WALLCOUNT = 20;
 int COINCOUNT = 3;
 
+int totalScore = 0;
+bool isDark = false;
+
 constexpr int COINSCORE = 10;
 
 int coinsCollected = 0;
-bool pause = true;
-bool gameOver = false;
 
 std::random_device rand_dev;
 std::mt19937 gen(rand_dev());
@@ -206,7 +210,7 @@ void Enemy::moveEnemy()
     bool moved = false;
     int ct = 0;
 
-    while (!moved && !pause)
+    while (!moved && gm == GameMode::PLAYING)
     {
         if (ct)
         {
@@ -553,24 +557,22 @@ int main(int argc, char *argv[])
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
-    for (int i = 0; i < 3; ++i)
+    while (static_cast<int>(gs) != static_cast<int>(GameState::END))
     {
         auto obstacles = generateObstacles();
+        auto enemies = generateEnemies();
+        auto coins = generateCoins();
+
         float obstacleArray[obstacles.size()];
 
         for (int i = 0; i < obstacles.size(); i++)
             obstacleArray[i] = obstacles[i];
-
-        auto enemies = generateEnemies();
-        auto coins = generateCoins();
 
         auto p = pos(PLAYERSIZE);
         while (isCollidingWithObstacles(p, PLAYERSIZE) || isCollidingWithEnemies(p, PLAYERSIZE * 9) || isCollidingWithCoins(p, PLAYERSIZE * 2))
             p = pos(PLAYERSIZE);
 
         playerPos = p;
-        std::cout << "Player position: " << p.x << " " << p.y << std::endl;
-
         doorPos = pos(DOORSIZE).x;
 
         float doorArray[] = {
@@ -616,7 +618,6 @@ int main(int argc, char *argv[])
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
         glEnableVertexAttribArray(1);
 
-
         glBindVertexArray(obstacleVAO);
         glBindBuffer(GL_ARRAY_BUFFER, obstacleVBO);
         glBufferData(GL_ARRAY_BUFFER, sizeof(obstacleArray), obstacleArray, GL_STATIC_DRAW);
@@ -645,7 +646,7 @@ int main(int argc, char *argv[])
 
         // render loop
 
-        while (!glfwWindowShouldClose(window))
+        while (static_cast<int>(gs) != static_cast<int>(GameState::END) && !glfwWindowShouldClose(window))
         {
             float currentFrame = static_cast<float>(glfwGetTime());
             deltaTime = currentFrame - lastFrame;
@@ -655,11 +656,9 @@ int main(int argc, char *argv[])
 
             if (isCollidingWithEnemies(playerPos, PLAYERSIZE))
             {
-                if (!gameOver)
-                    std::cout << "Game Over" << std::endl << "Score: " << coinsCollected * COINSCORE << std::endl;
-
-                gameOver = true;
-                pause = true;
+                if (static_cast<int>(gm) != static_cast<int>(GameMode::LOST) && static_cast<int>(gm) != static_cast<int>(GameMode::PAUSE))
+                    std::cout << "Game Over" << std::endl << "Score: " << totalScore << std::endl;
+                gm = GameMode::LOST;
             }
 
             if (isCollidingWithCoins(playerPos, PLAYERSIZE))
@@ -675,37 +674,37 @@ int main(int argc, char *argv[])
                         rightCoins.erase(rightCoins.begin() + i);
                         coins.erase(coins.begin() + i);
                         coinsCollected++;
-                        std::cout << "Score: " << coinsCollected * COINSCORE << std::endl;
+                        totalScore += COINSCORE * ((isDark) ? 2 : 1);
+                        std::cout << "Score: " << totalScore << std::endl;
                         break;
                     }
             }
 
-            if (!gameOver && coinsCollected == COINCOUNT)
-            {
-                if (playerPos.x - PLAYERSIZE <= doorPos + DOORSIZE && playerPos.x + PLAYERSIZE >= doorPos - DOORSIZE && playerPos.y + PLAYERSIZE >= UPWALL - PLAYERSIZE)
+            // Colliding with the door
+            if (gm == GameMode::PLAYING)
+                if (coinsCollected == COINCOUNT && playerPos.x <= doorPos + DOORSIZE && playerPos.x >= doorPos - DOORSIZE && playerPos.y + PLAYERSIZE >= UPWALL - PLAYERSIZE)
                 {
-                    std::cout << "You Win!" << std::endl << "Score: " << coinsCollected * COINSCORE << std::endl;
-                    gameOver = true;
-                    pause = true;
+                    std::cout << "Level Completed" << std::endl << "Score: " << totalScore << std::endl;
+                    gm = GameMode::WON;
+                    break;
                 }
-            }
 
-            if (gameOver && !pause)
-                break;
-
-            // render
+            // Clearing the screen
             glClearColor(0.0, 0.0, 0.0, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
             ourShader.use();
-            ourShader.setMat4("model", model);
 
+            // Setting the player model
+            ourShader.setMat4("model", model);
+            ourShader.setBool("isDark", isDark);
+            ourShader.setVec3("playerPos", playerPos);
+
+            // Binding the character
             glBindVertexArray(characterVAO);
             glDrawArrays(GL_TRIANGLES, 0, 6);
-            // render box
-            //unsigned int modelLoc;
-            //glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(glm::mat4(1)));
 
+            // Clearing the enemy positions
             upEnemies.clear();
             downEnemies.clear();
             leftEnemies.clear();
@@ -715,6 +714,7 @@ int main(int argc, char *argv[])
             {
                 enemy.moveEnemy();
                 ourShader.setMat4("model", enemy.model);
+
                 glBindVertexArray(enemy.VAO);
                 glDrawArrays(GL_TRIANGLES, 0, 36);
             }
@@ -738,14 +738,17 @@ int main(int argc, char *argv[])
 
             glBindVertexArray(VAO);
             glDrawArrays(GL_TRIANGLES, 0, 6);
-            // glfw: swap buffers and poll IO events (keys pressed/released, mouse
-            // moved etc.)
+
             glfwSwapBuffers(window);
             glfwPollEvents();
-
-            //modelLoc = glGetUniformLocation(ourShader.ID, "model");
-            //glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
         }
+
+        if (gs == GameState::END)
+            break;
+        else if (gs == GameState::LEVEL3)
+            gm = GameMode::PAUSE, gs = GameState::END;
+        else
+            gs = static_cast<GameState> (static_cast<int> (gs) + 1);
 
         upObstacles.clear();
         downObstacles.clear();
@@ -763,26 +766,24 @@ int main(int argc, char *argv[])
         rightCoins.clear();
 
         coinsCollected = 0;
-        pause = true;
-        gameOver = false;
 
         ENEMYCOUNT += 1;
         WALLCOUNT += 1;
         COINCOUNT += 1;
 
         model = glm::mat4(1);
-        deltaTime = 0.0f;	// time between current frame and last frame
+        deltaTime = 0.0f;
         lastFrame = 0.0f;
+
+        isDark = false;
     }
-    // optional: de-allocate all resources once they've outlived their purpose:
+
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
 
-    // Unbind next VAO
     glDeleteVertexArrays(1, &wallVAO);
     glDeleteBuffers(1, &wallVBO);
 
-    // glfw: terminate, clearing all previously allocated GLFW resources.
     glfwTerminate();
     return 0;
 }
@@ -799,57 +800,118 @@ void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
 void processInput(GLFWwindow *window)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+    {
         glfwSetWindowShouldClose(window, true);
+        gs = GameState::END;
+        gm = GameMode::PAUSE;
+
+        return;
+    }
 
     static bool pauseFlag = false;
+    static bool darkFlag = false;
 
     if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
     {
         if (!pauseFlag)
-            pause = !pause;
+        {
+            switch (gm)
+            {
+                case GameMode::PLAYING:
+                    gm = GameMode::PAUSE;
+                    break;
+                case GameMode::WON:
+                    gm = GameMode::PLAYING;
+                    if (gs == GameState::END) { return; }
 
+                    break;
+                case GameMode::LOST:
+                    gm = GameMode::PAUSE;
+                    gs = GameState::END;
+                    return;
+                    break;
+                case GameMode::PAUSE:
+                    gm = GameMode::PLAYING;
+                    break;
+            }
+        }
         pauseFlag = true;
     }
     else
         pauseFlag = false;
 
-    glm::vec3 tempPos = glm::vec3(0.0f, 0.0f, 0.0f);
+    // Toggle dark mode on/off with l key
+    if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS)
+    {
+        if (!darkFlag)
+            isDark = !isDark;
+        darkFlag = true;
+    }
+    else
+        darkFlag = false;
+
+    static glm::vec3 tempPos, lastPos = glm::vec3(0.0f, 0.0f, 0.0f);
+    tempPos = glm::vec3(0.0f, 0.0f, 0.0f);
+
+    static float speedx = 0.0f;
+    static float speedy = 0.0f;
 
     float speed = static_cast<float>(0.5 * deltaTime);
-    bool isMoving = true;
 
-    if (!pause)
+    if (gm == GameMode::PLAYING)
     {
+        bool move = false;
+        auto up = speed * glm::vec3(0.0f, 1.0f, 0.0f);
+        auto right = speed * glm::vec3(1.0f, 0.0f, 0.0f);
+
         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
         {
-            tempPos = speed * glm::vec3(0.0f, 1.0f, 0.0f);
-
-            if (!isColliding(playerPos + tempPos, PLAYERSIZE))
-                playerPos += tempPos, model = glm::translate(model, tempPos);
+            if (!isColliding(playerPos + up, PLAYERSIZE))
+                tempPos += up, move = true;
         }
 
-        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS && (move = true))
         {
-            tempPos = speed * glm::vec3(0.0f, -1.0f, Z);
-
-            if (!isColliding(playerPos + tempPos, PLAYERSIZE))
-                playerPos += tempPos, model = glm::translate(model, tempPos);
+            if (!isColliding(playerPos - up, PLAYERSIZE))
+                tempPos -= up, move = true;
         }
 
-        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS && (move = true))
         {
-            tempPos = speed * glm::vec3(-1.0f, 0.0f, Z);
-
-            if (!isColliding(playerPos + tempPos, PLAYERSIZE))
-                playerPos += tempPos, model = glm::translate(model, tempPos);
+            if (!isColliding(playerPos - right, PLAYERSIZE))
+                tempPos -= right, move = true;
         }
 
-        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS && (move = true))
         {
-            tempPos = speed * glm::vec3(1.0f, 0.0f, Z);
+            if (!isColliding(playerPos + right, PLAYERSIZE))
+                tempPos += right, move = true;
+        }
+
+        if (move && tempPos != glm::vec3(0, 0, 0))
+        {
+            tempPos = glm::normalize(tempPos);
+            tempPos = glm::vec3((speed + speedx) * tempPos.x, (speed + speedy) * tempPos.y, Z);
 
             if (!isColliding(playerPos + tempPos, PLAYERSIZE))
+            {
                 playerPos += tempPos, model = glm::translate(model, tempPos);
+                if (tempPos.x * lastPos.x > 0)
+                    speedx += 0.0002;
+                else
+                    speedx = 0;
+
+                if (tempPos.y * lastPos.y > 0)
+                    speedy += 0.0002;
+                else
+                    speedy = 0;
+
+                lastPos = tempPos;
+            }
         }
+        else
+            lastPos = glm::vec3(0, 0, 0), speedx = speedy = 0.0f;
     }
+    else
+        lastPos = glm::vec3(0, 0, 0), speedx = speedy = 0.0f;
 }
