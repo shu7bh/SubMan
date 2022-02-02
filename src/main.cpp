@@ -21,6 +21,20 @@ enum class Direction {
     RIGHT
 };
 
+enum class GameState {
+    LEVEL1,
+    LEVEL2,
+    LEVEL3,
+    END,
+};
+
+enum class GameMode {
+    PAUSE,
+    LOST,
+    PLAYING,
+    WON
+};
+
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void processInput(GLFWwindow *window);
 
@@ -65,9 +79,9 @@ constexpr float ENEMYSIZE = 0.02f;
 constexpr float COINSIZE = 0.015f;
 constexpr float DOORSIZE = 0.08f;
 
-constexpr int ENEMYCOUNT = 8;
-constexpr int WALLCOUNT = 20;
-constexpr int COINCOUNT = 5;
+int ENEMYCOUNT = 5;
+int WALLCOUNT = 20;
+int COINCOUNT = 3;
 
 constexpr int COINSCORE = 10;
 
@@ -112,10 +126,12 @@ bool isColidingWithMainWalls(glm::vec3 p, float d)
     return false;
 }
 
-bool isCollidingWithEnemies(glm::vec3 p, float d)
+bool isCollidingWithEnemies(glm::vec3 p, float d, glm::vec3 t = glm::vec3(0, 0, 0))
 {
+    auto a = p - t;
     for (int i = 0; i < upEnemies.size(); ++i)
-        if (p.y + d >= downEnemies[i] && p.y - d <= upEnemies[i] && p.x + d >= leftEnemies[i] && p.x - d <= rightEnemies[i])
+        if (a.y + d == upEnemies[i] && a.y - d == downEnemies[i] && a.x - d == leftEnemies[i] && a.x + d == rightEnemies[i]);
+        else if (p.y + d >= downEnemies[i] && p.y - d <= upEnemies[i] && p.x + d >= leftEnemies[i] && p.x - d <= rightEnemies[i])
             return true;
 
     return false;
@@ -140,9 +156,9 @@ bool isColliding(glm::vec3 p, float d)
     return false;
 }
 
-bool isCollidingWithAll(glm::vec3 p, float d)
+bool isCollidingWithAll(glm::vec3 p, float d, glm::vec3 t = glm::vec3(0, 0, 0))
 {
-    if (isColliding(p, d) || isCollidingWithEnemies(p, d) || isCollidingWithCoins(p, d))
+    if (isColliding(p, d) || isCollidingWithEnemies(p, d, t) || isCollidingWithCoins(p, d))
         return true;
     return false;
 }
@@ -155,18 +171,22 @@ glm::vec3 pos(float d)
     return glm::vec3(x(gen), y(gen), Z);
 }
 
+std::uniform_real_distribution<float> s(0.1, 0.5);
 
 struct Enemy
 {
     glm::mat4 model = glm::mat4(1.0f);
     glm::vec3 enemyPos;
-    float speed = 0.25f;
+    float speed;
 
-	unsigned int VBO, VAO;
+    unsigned int VBO, VAO;
     Direction dir;
 
     Enemy(glm::vec3 enemyPos, Direction(dir)) :
-        enemyPos(enemyPos), dir(dir) { }
+        enemyPos(enemyPos), dir(dir)
+    {
+        speed = s(gen);
+    }
 
     void moveEnemy();
 };
@@ -183,21 +203,19 @@ struct Coin
 
 void Enemy::moveEnemy()
 {
-    static std::uniform_real_distribution<float> direction(0.0f, 1.0f);
-
     bool moved = false;
     int ct = 0;
 
     while (!moved && !pause)
     {
-        float direc = direction(gen);
         if (ct)
         {
             glm::vec3 tempPos;
             auto p = glm::normalize(pos(0));
             tempPos = glm::vec3(speed * deltaTime * p);
 
-            if (!isColliding(enemyPos + tempPos, ENEMYSIZE)) {
+            if (!isColliding(enemyPos + tempPos, ENEMYSIZE))
+            {
                 this->model = glm::translate(this->model, tempPos);
                 enemyPos += tempPos;
                 moved = true;
@@ -210,7 +228,7 @@ void Enemy::moveEnemy()
             p = glm::normalize(p);
             auto tempPos = speed * deltaTime * p;
 
-            if (!isCollidingWithAll(enemyPos + tempPos, ENEMYSIZE))
+            if (!isCollidingWithAll(enemyPos + tempPos, ENEMYSIZE, tempPos))
             {
                 this->model = glm::translate(this->model, tempPos);
                 enemyPos += tempPos;
@@ -314,7 +332,7 @@ std::vector<Enemy> generateEnemies()
         auto p = pos(ENEMYSIZE);
         float d = ENEMYSIZE;
 
-        while (isCollidingWithObstacles(p, d) && isCollidingWithEnemies(p, d))
+        while (isCollidingWithAll(p, d))
             p = pos(ENEMYSIZE);
 
         float arr[] = {
@@ -338,18 +356,18 @@ std::vector<Enemy> generateEnemies()
 
         switch (direc)
         {
-        case 0:
-            dir = Direction::UP;
-            break;
-        case 1:
-            dir = Direction::DOWN;
-            break;
-        case 2:
-            dir = Direction::LEFT;
-            break;
-        case 3:
-            dir = Direction::RIGHT;
-            break;
+            case 0:
+                dir = Direction::UP;
+                break;
+            case 1:
+                dir = Direction::DOWN;
+                break;
+            case 2:
+                dir = Direction::LEFT;
+                break;
+            case 3:
+                dir = Direction::RIGHT;
+                break;
         }
 
         Enemy enemy(glm::vec3(p.x, p.y, Z), dir);
@@ -382,8 +400,8 @@ std::vector<Coin> generateCoins()
         float d = COINSIZE;
         auto p = pos(d);
 
-        while (isCollidingWithObstacles(p, d) && isCollidingWithCoins(p, d))
-            p = pos(ENEMYSIZE);
+        while (isCollidingWithAll(p, d))
+            p = pos(d);
 
         float arr[] = {
             p.x + d, p.y, Z, COINCOLORR, COINCOLORG, COINCOLORB,
@@ -425,36 +443,36 @@ std::vector<Coin> generateCoins()
 int main(int argc, char *argv[])
 {
 
-	// glfw: initialize and configure
-	glfwInit();
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    // glfw: initialize and configure
+    glfwInit();
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
 #ifdef __APPLE__
-	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
 
-	// glfw window creation
-	GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "2D Game", NULL, NULL);
-	if (window == NULL) {
-		std::cout << "Failed to create GLFW window" << std::endl;
-		glfwTerminate();
-		return -1;
-	}
-	glfwMakeContextCurrent(window);
-	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+    // glfw window creation
+    GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "2D Game", NULL, NULL);
+    if (window == NULL) {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    glfwMakeContextCurrent(window);
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
-	// glad: load all OpenGL function pointers
-	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-		std::cout << "Failed to initialize GLAD" << std::endl;
-		return -1;
-	}
+    // glad: load all OpenGL function pointers
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+        std::cout << "Failed to initialize GLAD" << std::endl;
+        return -1;
+    }
 
     glEnable(GL_DEPTH_TEST);
 
-	// build and compile our shader program
-	Shader ourShader("../src/vertex.shader", "../src/fragment.shader");
+    // build and compile our shader program
+    Shader ourShader("../src/vertex.shader", "../src/fragment.shader");
 
     float vertices[] = {
         // FLOOR
@@ -506,60 +524,11 @@ int main(int argc, char *argv[])
         RIGHTFLOOR, UPFLOOR, Z, WALLCOLOR, WALLCOLOR, WALLCOLOR
     };
 
-    auto obstacles = generateObstacles();
-    float obstacleArray[obstacles.size()];
-
-    for (int i = 0; i < obstacles.size(); i++)
-        obstacleArray[i] = obstacles[i];
-
-    auto enemies = generateEnemies();
-    auto coins = generateCoins();
-
-    auto p = pos(PLAYERSIZE);
-    while (isCollidingWithObstacles(p, PLAYERSIZE) || isCollidingWithEnemies(p, PLAYERSIZE * 9) || isCollidingWithCoins(p, PLAYERSIZE * 2))
-        p = pos(PLAYERSIZE);
-
-    doorPos = pos(DOORSIZE).x;
-
-    float doorArray[] = {
-        // Door
-        doorPos + DOORSIZE, UPFLOOR, Z, DOORCOLORR, DOORCOLORG, DOORCOLORB,
-        doorPos - DOORSIZE, UPFLOOR, Z, DOORCOLORR, DOORCOLORG, DOORCOLORB,
-        doorPos + DOORSIZE, UPWALL, Z, DOORCOLORR, DOORCOLORG, DOORCOLORB,
-
-        doorPos - DOORSIZE, UPWALL, Z, DOORCOLORR, DOORCOLORG, DOORCOLORB,
-        doorPos - DOORSIZE, UPFLOOR, Z, DOORCOLORR, DOORCOLORG, DOORCOLORB,
-        doorPos + DOORSIZE, UPWALL, Z, DOORCOLORR, DOORCOLORG, DOORCOLORB
-    };
-
-    playerPos = p;
-
-    float character[] = {
-        p.x + PLAYERSIZE, p.y, Z, PLAYERCOLORR, PLAYERCOLORG, PLAYERCOLORB,
-        p.x - PLAYERSIZE, p.y, Z, PLAYERCOLORR, PLAYERCOLORG, PLAYERCOLORB,
-        p.x, p.y + PLAYERSIZE, Z, PLAYERCOLORR, PLAYERCOLORG, PLAYERCOLORB,
-
-        p.x + PLAYERSIZE, p.y, Z, PLAYERCOLORR, PLAYERCOLORG, PLAYERCOLORB,
-        p.x - PLAYERSIZE, p.y, Z, PLAYERCOLORR, PLAYERCOLORG, PLAYERCOLORB,
-        p.x, p.y - PLAYERSIZE, Z, PLAYERCOLORR, PLAYERCOLORG, PLAYERCOLORB
-    };
-
-	unsigned int VBO, VAO, wallVAO, wallVBO;
-    unsigned characterVAO, characterVBO;
-    unsigned obstacleVAO, obstacleVBO;
-    unsigned doorVAO, doorVBO;
-
+    unsigned int VBO, VAO, wallVAO, wallVBO;
     glGenVertexArrays(1, &VAO);
     glGenVertexArrays(1, &wallVAO);
-    glGenVertexArrays(1, &characterVAO);
-    glGenVertexArrays(1, &obstacleVAO);
-    glGenVertexArrays(1, &doorVAO);
-
     glGenBuffers(1, &VBO);
     glGenBuffers(1, &wallVBO);
-    glGenBuffers(1, &characterVBO);
-    glGenBuffers(1, &obstacleVBO);
-    glGenBuffers(1, &doorVBO);
 
     glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
@@ -584,177 +553,258 @@ int main(int argc, char *argv[])
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
-    glBindVertexArray(characterVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, characterVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(character), character, GL_STATIC_DRAW);
+    for (int i = 0; i < 3; ++i)
+    {
+        auto obstacles = generateObstacles();
+        float obstacleArray[obstacles.size()];
 
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
+        for (int i = 0; i < obstacles.size(); i++)
+            obstacleArray[i] = obstacles[i];
 
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
+        auto enemies = generateEnemies();
+        auto coins = generateCoins();
+
+        auto p = pos(PLAYERSIZE);
+        while (isCollidingWithObstacles(p, PLAYERSIZE) || isCollidingWithEnemies(p, PLAYERSIZE * 9) || isCollidingWithCoins(p, PLAYERSIZE * 2))
+            p = pos(PLAYERSIZE);
+
+        playerPos = p;
+        std::cout << "Player position: " << p.x << " " << p.y << std::endl;
+
+        doorPos = pos(DOORSIZE).x;
+
+        float doorArray[] = {
+            // Door
+            doorPos + DOORSIZE, UPFLOOR, Z, DOORCOLORR, DOORCOLORG, DOORCOLORB,
+            doorPos - DOORSIZE, UPFLOOR, Z, DOORCOLORR, DOORCOLORG, DOORCOLORB,
+            doorPos + DOORSIZE, UPWALL, Z, DOORCOLORR, DOORCOLORG, DOORCOLORB,
+
+            doorPos - DOORSIZE, UPWALL, Z, DOORCOLORR, DOORCOLORG, DOORCOLORB,
+            doorPos - DOORSIZE, UPFLOOR, Z, DOORCOLORR, DOORCOLORG, DOORCOLORB,
+            doorPos + DOORSIZE, UPWALL, Z, DOORCOLORR, DOORCOLORG, DOORCOLORB
+        };
+
+        float character[] = {
+            p.x + PLAYERSIZE, p.y, Z, PLAYERCOLORR, PLAYERCOLORG, PLAYERCOLORB,
+            p.x - PLAYERSIZE, p.y, Z, PLAYERCOLORR, PLAYERCOLORG, PLAYERCOLORB,
+            p.x, p.y + PLAYERSIZE, Z, PLAYERCOLORR, PLAYERCOLORG, PLAYERCOLORB,
+
+            p.x + PLAYERSIZE, p.y, Z, PLAYERCOLORR, PLAYERCOLORG, PLAYERCOLORB,
+            p.x - PLAYERSIZE, p.y, Z, PLAYERCOLORR, PLAYERCOLORG, PLAYERCOLORB,
+            p.x, p.y - PLAYERSIZE, Z, PLAYERCOLORR, PLAYERCOLORG, PLAYERCOLORB
+        };
+
+        unsigned characterVAO, characterVBO;
+        unsigned obstacleVAO, obstacleVBO;
+        unsigned doorVAO, doorVBO;
+
+        glGenVertexArrays(1, &characterVAO);
+        glGenVertexArrays(1, &obstacleVAO);
+        glGenVertexArrays(1, &doorVAO);
+
+        glGenBuffers(1, &characterVBO);
+        glGenBuffers(1, &obstacleVBO);
+        glGenBuffers(1, &doorVBO);
+
+        glBindVertexArray(characterVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, characterVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(character), character, GL_STATIC_DRAW);
+
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(0);
+
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+        glEnableVertexAttribArray(1);
 
 
-    glBindVertexArray(obstacleVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, obstacleVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(obstacleArray), obstacleArray, GL_STATIC_DRAW);
+        glBindVertexArray(obstacleVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, obstacleVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(obstacleArray), obstacleArray, GL_STATIC_DRAW);
 
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(0);
 
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+        glEnableVertexAttribArray(1);
 
-    glBindVertexArray(doorVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, doorVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(doorArray), doorArray, GL_STATIC_DRAW);
+        glBindVertexArray(doorVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, doorVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(doorArray), doorArray, GL_STATIC_DRAW);
 
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(0);
 
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+        glEnableVertexAttribArray(1);
 
-	// You can unbind the VAO afterwards so other VAO calls won't accidentally
-	// modify this VAO, but this rarely happens. Modifying other VAOs requires a
-	// call to glBindVertexArray anyways so we generally don't unbind VAOs (nor
-	// VBOs) when it's not directly necessary.
-	glBindVertexArray(0);
+        // You can unbind the VAO afterwards so other VAO calls won't accidentally
+        // modify this VAO, but this rarely happens. Modifying other VAOs requires a
+        // call to glBindVertexArray anyways so we generally don't unbind VAOs (nor
+        // VBOs) when it's not directly necessary.
+        glBindVertexArray(0);
 
-	// render loop
+        // render loop
 
-    while (!glfwWindowShouldClose(window)) {
-        float currentFrame = static_cast<float>(glfwGetTime());
-        deltaTime = currentFrame - lastFrame;
-        lastFrame = currentFrame;
-
-        processInput(window);
-
-        if (isCollidingWithEnemies(playerPos, PLAYERSIZE))
+        while (!glfwWindowShouldClose(window))
         {
-            if (!gameOver)
-                std::cout << "Game Over" << std::endl << "Score: " << coinsCollected * COINSCORE << std::endl;
+            float currentFrame = static_cast<float>(glfwGetTime());
+            deltaTime = currentFrame - lastFrame;
+            lastFrame = currentFrame;
 
-            gameOver = true;
-            pause = true;
-        }
+            processInput(window);
 
-        if (isCollidingWithCoins(playerPos, PLAYERSIZE))
-        {
-            float d = PLAYERSIZE;
-            auto p = playerPos;
-            for (int i = 0; i < upCoins.size(); ++i)
-                if (p.y + d >= downCoins[i] && p.y - d <= upCoins[i] && p.x + d >= leftCoins[i] && p.x - d <= rightCoins[i])
-                {
-                    upCoins.erase(upCoins.begin() + i);
-                    downCoins.erase(downCoins.begin() + i);
-                    leftCoins.erase(leftCoins.begin() + i);
-                    rightCoins.erase(rightCoins.begin() + i);
-                    coins.erase(coins.begin() + i);
-                    coinsCollected++;
-                    std::cout << "Score: " << coinsCollected * COINSCORE << std::endl;
-                    break;
-                }
-        }
-
-        if (!gameOver && coinsCollected == COINCOUNT)
-        {
-            if (playerPos.x - PLAYERSIZE <= doorPos + DOORSIZE && playerPos.x + PLAYERSIZE >= doorPos - DOORSIZE && playerPos.y + PLAYERSIZE >= UPWALL - PLAYERSIZE)
+            if (isCollidingWithEnemies(playerPos, PLAYERSIZE))
             {
-                std::cout << "You Win!" << std::endl << "Score: " << coinsCollected * COINSCORE << std::endl;
+                if (!gameOver)
+                    std::cout << "Game Over" << std::endl << "Score: " << coinsCollected * COINSCORE << std::endl;
+
                 gameOver = true;
                 pause = true;
             }
+
+            if (isCollidingWithCoins(playerPos, PLAYERSIZE))
+            {
+                float d = PLAYERSIZE;
+                auto p = playerPos;
+                for (int i = 0; i < upCoins.size(); ++i)
+                    if (p.y + d >= downCoins[i] && p.y - d <= upCoins[i] && p.x + d >= leftCoins[i] && p.x - d <= rightCoins[i])
+                    {
+                        upCoins.erase(upCoins.begin() + i);
+                        downCoins.erase(downCoins.begin() + i);
+                        leftCoins.erase(leftCoins.begin() + i);
+                        rightCoins.erase(rightCoins.begin() + i);
+                        coins.erase(coins.begin() + i);
+                        coinsCollected++;
+                        std::cout << "Score: " << coinsCollected * COINSCORE << std::endl;
+                        break;
+                    }
+            }
+
+            if (!gameOver && coinsCollected == COINCOUNT)
+            {
+                if (playerPos.x - PLAYERSIZE <= doorPos + DOORSIZE && playerPos.x + PLAYERSIZE >= doorPos - DOORSIZE && playerPos.y + PLAYERSIZE >= UPWALL - PLAYERSIZE)
+                {
+                    std::cout << "You Win!" << std::endl << "Score: " << coinsCollected * COINSCORE << std::endl;
+                    gameOver = true;
+                    pause = true;
+                }
+            }
+
+            if (gameOver && !pause)
+                break;
+
+            // render
+            glClearColor(0.0, 0.0, 0.0, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            ourShader.use();
+            ourShader.setMat4("model", model);
+
+            glBindVertexArray(characterVAO);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+            // render box
+            //unsigned int modelLoc;
+            //glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(glm::mat4(1)));
+
+            upEnemies.clear();
+            downEnemies.clear();
+            leftEnemies.clear();
+            rightEnemies.clear();
+
+            for (auto& enemy: enemies)
+            {
+                enemy.moveEnemy();
+                ourShader.setMat4("model", enemy.model);
+                glBindVertexArray(enemy.VAO);
+                glDrawArrays(GL_TRIANGLES, 0, 36);
+            }
+
+            ourShader.setMat4("model", glm::mat4(1));
+
+            for (auto& coin: coins)
+            {
+                glBindVertexArray(coin.VAO);
+                glDrawArrays(GL_TRIANGLES, 0, 36);
+            }
+
+            glBindVertexArray(doorVAO);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+
+            glBindVertexArray(obstacleVAO);
+            glDrawArrays(GL_TRIANGLES, 0, obstacles.size() / 6);
+
+            glBindVertexArray(wallVAO);
+            glDrawArrays(GL_TRIANGLES, 0, 24);
+
+            glBindVertexArray(VAO);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+            // glfw: swap buffers and poll IO events (keys pressed/released, mouse
+            // moved etc.)
+            glfwSwapBuffers(window);
+            glfwPollEvents();
+
+            //modelLoc = glGetUniformLocation(ourShader.ID, "model");
+            //glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
         }
 
-		// render
-		glClearColor(0.0, 0.0, 0.0, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-		ourShader.use();
-        ourShader.setMat4("model", model);
-
-        glBindVertexArray(characterVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        // render box
-        //unsigned int modelLoc;
-        //glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(glm::mat4(1)));
+        upObstacles.clear();
+        downObstacles.clear();
+        leftObstacles.clear();
+        rightObstacles.clear();
 
         upEnemies.clear();
         downEnemies.clear();
         leftEnemies.clear();
         rightEnemies.clear();
 
-        for (auto& enemy: enemies)
-        {
-            enemy.moveEnemy();
-            ourShader.setMat4("model", enemy.model);
-            glBindVertexArray(enemy.VAO);
-            glDrawArrays(GL_TRIANGLES, 0, 36);
-        }
+        upCoins.clear();
+        downCoins.clear();
+        leftCoins.clear();
+        rightCoins.clear();
 
-        ourShader.setMat4("model", glm::mat4(1));
+        coinsCollected = 0;
+        pause = true;
+        gameOver = false;
 
-        for (auto& coin: coins)
-        {
-            glBindVertexArray(coin.VAO);
-            glDrawArrays(GL_TRIANGLES, 0, 36);
-        }
+        ENEMYCOUNT += 1;
+        WALLCOUNT += 1;
+        COINCOUNT += 1;
 
-        glBindVertexArray(doorVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-
-        glBindVertexArray(obstacleVAO);
-        glDrawArrays(GL_TRIANGLES, 0, obstacles.size() / 6);
-
-        glBindVertexArray(wallVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 24);
-
-        glBindVertexArray(VAO);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-		// glfw: swap buffers and poll IO events (keys pressed/released, mouse
-		// moved etc.)
-		glfwSwapBuffers(window);
-		glfwPollEvents();
-
-        //modelLoc = glGetUniformLocation(ourShader.ID, "model");
-        //glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+        model = glm::mat4(1);
+        deltaTime = 0.0f;	// time between current frame and last frame
+        lastFrame = 0.0f;
     }
-
-	// optional: de-allocate all resources once they've outlived their purpose:
-	glDeleteVertexArrays(1, &VAO);
-	glDeleteBuffers(1, &VBO);
+    // optional: de-allocate all resources once they've outlived their purpose:
+    glDeleteVertexArrays(1, &VAO);
+    glDeleteBuffers(1, &VBO);
 
     // Unbind next VAO
     glDeleteVertexArrays(1, &wallVAO);
-	glDeleteBuffers(1, &wallVBO);
+    glDeleteBuffers(1, &wallVBO);
 
-	// glfw: terminate, clearing all previously allocated GLFW resources.
-	glfwTerminate();
-	return 0;
+    // glfw: terminate, clearing all previously allocated GLFW resources.
+    glfwTerminate();
+    return 0;
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback
 // function executes
 void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
-	// make sure the viewport matches the new window dimensions; note that width
-	// and height will be significantly larger than specified on retina
-	// displays.
-	glViewport(0, 0, width, height);
+    // make sure the viewport matches the new window dimensions; note that width
+    // and height will be significantly larger than specified on retina
+    // displays.
+    glViewport(0, 0, width, height);
 }
 
 void processInput(GLFWwindow *window)
 {
- 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
- 		glfwSetWindowShouldClose(window, true);
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, true);
 
     static bool pauseFlag = false;
 
     if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
     {
-        if (gameOver)
-            glfwSetWindowShouldClose(window, true);
-
         if (!pauseFlag)
             pause = !pause;
 
