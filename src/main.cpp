@@ -10,162 +10,12 @@
 #include <random>
 
 #include "shader.h"
-
-# define radius 1.0f
-#define PI 3.141592653589793
-
-enum class Direction {
-    UP,
-    DOWN,
-    LEFT,
-    RIGHT
-};
-
-enum class GameState {
-    LEVEL1,
-    LEVEL2,
-    LEVEL3,
-    END,
-};
-
-enum class GameMode {
-    PAUSE,
-    LOST,
-    PLAYING,
-    WON
-};
+#include "global.h"
+#include "Enemy.h"
+#include "Colliding.h"
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void processInput(GLFWwindow *window);
-
-float deltaTime = 0.0f;	// time between current frame and last frame
-float lastFrame = 0.0f;
-glm::mat4 model = glm::mat4(1);
-// settings
-const unsigned int SCR_WIDTH = 1080;
-const unsigned int SCR_HEIGHT = 1080;
-
-constexpr float Z = 0.0f;
-constexpr float UPFLOOR = 0.6f;
-constexpr float DOWNFLOOR = -UPFLOOR;
-constexpr float RIGHTFLOOR = 1.0f;
-constexpr float LEFTFLOOR = -RIGHTFLOOR;
-
-constexpr float FLOORCOLOR = 0.17f;
-constexpr float WALLCOLOR = 0.30f;
-constexpr float PLAYERCOLORR = 1.0f;
-constexpr float PLAYERCOLORG = 1.0f;
-constexpr float PLAYERCOLORB = 0.0f;
-
-constexpr float ENEMYCOLORR = 0.0f;
-constexpr float ENEMYCOLORG = 0.0f;
-constexpr float ENEMYCOLORB = 1.0f;
-
-constexpr float COINCOLORR = 0.0f;
-constexpr float COINCOLORG = 1.0f;
-constexpr float COINCOLORB = 1.0f;
-
-constexpr float DOORCOLORR = 1.0f;
-constexpr float DOORCOLORG = 1.0f;
-constexpr float DOORCOLORB = 0.5f;
-
-constexpr float UPWALL = 0.55f;
-constexpr float DOWNWALL = -UPWALL;
-constexpr float RIGHTWALL = 0.95f;
-constexpr float LEFTWALL = -RIGHTWALL;
-constexpr float WALLSIZE = 0.025f;
-constexpr float PLAYERSIZE = 0.02f;
-constexpr float ENEMYSIZE = 0.02f;
-constexpr float COINSIZE = 0.015f;
-constexpr float DOORSIZE = 0.08f;
-
-GameMode gm = GameMode::PAUSE;
-GameState gs = GameState::LEVEL1;
-
-int ENEMYCOUNT = 5;
-int WALLCOUNT = 20;
-int COINCOUNT = 3;
-
-int totalScore = 0;
-bool isDark = false;
-
-constexpr int COINSCORE = 10;
-
-int coinsCollected = 0;
-
-std::random_device rand_dev;
-std::mt19937 gen(rand_dev());
-
-glm::vec3 playerPos;
-float doorPos;
-
-std::vector<float> upObstacles;
-std::vector<float> downObstacles;
-std::vector<float> leftObstacles;
-std::vector<float> rightObstacles;
-
-std::vector<float> upEnemies;
-std::vector<float> downEnemies;
-std::vector<float> leftEnemies;
-std::vector<float> rightEnemies;
-
-std::vector<float> upCoins;
-std::vector<float> downCoins;
-std::vector<float> leftCoins;
-std::vector<float> rightCoins;
-
-bool isCollidingWithObstacles(glm::vec3 p, float d)
-{
-    for (int i = 0; i < upObstacles.size(); ++i)
-        if (p.y + d >= downObstacles[i] && p.y - d <= upObstacles[i] && p.x + d >= leftObstacles[i] && p.x - d <= rightObstacles[i])
-            return true;
-
-    return false;
-}
-
-bool isColidingWithMainWalls(glm::vec3 p, float d)
-{
-    if (p.x + d > RIGHTWALL || p.x - d < LEFTWALL || p.y + d > UPWALL || p.y - d < DOWNWALL)
-        return true;
-    return false;
-}
-
-bool isCollidingWithEnemies(glm::vec3 p, float d, glm::vec3 t = glm::vec3(0, 0, 0))
-{
-    auto a = p - t;
-    for (int i = 0; i < upEnemies.size(); ++i)
-        if (a.y + d == upEnemies[i] && a.y - d == downEnemies[i] && a.x - d == leftEnemies[i] && a.x + d == rightEnemies[i]);
-        else if (p.y + d >= downEnemies[i] && p.y - d <= upEnemies[i] && p.x + d >= leftEnemies[i] && p.x - d <= rightEnemies[i])
-            return true;
-
-    return false;
-}
-
-bool isCollidingWithCoins(glm::vec3 p, float d)
-{
-    for (int i = 0; i < upCoins.size(); ++i)
-        if (p.y + d >= downCoins[i] && p.y - d <= upCoins[i] && p.x + d >= leftCoins[i] && p.x - d <= rightCoins[i])
-            return true;
-
-    return false;
-}
-
-bool isColliding(glm::vec3 p, float d)
-{
-    if (isColidingWithMainWalls(p, d))
-        return true;
-    if (isCollidingWithObstacles(p, d))
-        return true;
-
-    return false;
-}
-
-bool isCollidingWithAll(glm::vec3 p, float d, glm::vec3 t = glm::vec3(0, 0, 0))
-{
-    if (isColliding(p, d) || isCollidingWithEnemies(p, d, t) || isCollidingWithCoins(p, d))
-        return true;
-    return false;
-}
 
 glm::vec3 pos(float d)
 {
@@ -174,26 +24,6 @@ glm::vec3 pos(float d)
 
     return glm::vec3(x(gen), y(gen), Z);
 }
-
-std::uniform_real_distribution<float> s(0.1, 0.5);
-
-struct Enemy
-{
-    glm::mat4 model = glm::mat4(1.0f);
-    glm::vec3 enemyPos;
-    float speed;
-
-    unsigned int VBO, VAO;
-    Direction dir;
-
-    Enemy(glm::vec3 enemyPos, Direction(dir)) :
-        enemyPos(enemyPos), dir(dir)
-    {
-        speed = s(gen);
-    }
-
-    void moveEnemy();
-};
 
 struct Coin
 {
@@ -204,86 +34,6 @@ struct Coin
     Coin(glm::vec3 coinPos) :
         coinPos(coinPos) { }
 };
-
-void Enemy::moveEnemy()
-{
-    static std::uniform_int_distribution<int> d(0, 4);
-    bool moved = false;
-
-    if (gm == GameMode::PLAYING)
-    {
-        auto tempPos = speed * deltaTime * glm::normalize(playerPos - enemyPos);
-
-        if (!isCollidingWithAll(enemyPos + tempPos, ENEMYSIZE, tempPos))
-        {
-            this->model = glm::translate(this->model, tempPos);
-            enemyPos += tempPos;
-            moved = true;
-        }
-
-        for (int ct = 0; !moved && ct < 10; ++ct)
-        {
-            switch (dir)
-            {
-            case Direction::UP:
-                tempPos = speed * deltaTime * glm::normalize(glm::vec3(0, 1, 0));
-                if (!isCollidingWithAll(enemyPos + tempPos, ENEMYSIZE, tempPos))
-                {
-                    this->model = glm::translate(this->model, tempPos);
-                    enemyPos += tempPos;
-                    moved = true;
-                }
-                break;
-
-            case Direction::DOWN:
-                tempPos = speed * deltaTime * glm::normalize(glm::vec3(0, -1, 0));
-                if (!isCollidingWithAll(enemyPos + tempPos, ENEMYSIZE, tempPos))
-                {
-                    this->model = glm::translate(this->model, tempPos);
-                    enemyPos += tempPos;
-                    moved = true;
-                }
-                break;
-
-            case Direction::LEFT:
-                tempPos = speed * deltaTime * glm::normalize(glm::vec3(-1, 0, 0));
-                if (!isCollidingWithAll(enemyPos + tempPos, ENEMYSIZE, tempPos))
-                {
-                    this->model = glm::translate(this->model, tempPos);
-                    enemyPos += tempPos;
-                    moved = true;
-                }
-                break;
-
-            case Direction::RIGHT:
-                tempPos = speed * deltaTime * glm::normalize(glm::vec3(1, 0, 0));
-                if (!isCollidingWithAll(enemyPos + tempPos, ENEMYSIZE, tempPos))
-                {
-                    this->model = glm::translate(this->model, tempPos);
-                    enemyPos += tempPos;
-                    moved = true;
-                }
-                break;
-            }
-
-            if (moved)
-                continue;
-
-            int a;
-            do
-                a = d(gen);
-            while (a == static_cast<int>(dir));
-
-            dir = static_cast<Direction>(a);
-        }
-    }
-
-    upEnemies.push_back(enemyPos.y + ENEMYSIZE);
-    downEnemies.push_back(enemyPos.y - ENEMYSIZE);
-    leftEnemies.push_back(enemyPos.x - ENEMYSIZE);
-    rightEnemies.push_back(enemyPos.x + ENEMYSIZE);
-}
-
 
 glm::vec3 color()
 {
@@ -674,10 +424,6 @@ int main(int argc, char *argv[])
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
         glEnableVertexAttribArray(1);
 
-        // You can unbind the VAO afterwards so other VAO calls won't accidentally
-        // modify this VAO, but this rarely happens. Modifying other VAOs requires a
-        // call to glBindVertexArray anyways so we generally don't unbind VAOs (nor
-        // VBOs) when it's not directly necessary.
         glBindVertexArray(0);
 
         // render loop
