@@ -97,8 +97,3 @@ extern std::vector<float> upEnemies;
 extern std::vector<float> downEnemies;
 extern std::vector<float> leftEnemies;
 extern std::vector<float> rightEnemies;
-
-extern std::vector<float> upCoins;
-extern std::vector<float> downCoins;
-extern std::vector<float> leftCoins;
-extern std::vector<float> rightCoins;

@@ -2,6 +2,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include "Coin.h"
 
 bool isCollidingWithObstacles(glm::vec3 p, float d)
 {
@@ -30,15 +31,6 @@ bool isCollidingWithEnemies(glm::vec3 p, float d, glm::vec3 t)
     return false;
 }
 
-bool isCollidingWithCoins(glm::vec3 p, float d)
-{
-    for (int i = 0; i < upCoins.size(); ++i)
-        if (p.y + d >= downCoins[i] && p.y - d <= upCoins[i] && p.x + d >= leftCoins[i] && p.x - d <= rightCoins[i])
-            return true;
-
-    return false;
-}
-
 bool isColliding(glm::vec3 p, float d)
 {
     if (isColidingWithMainWalls(p, d))
@@ -51,9 +43,7 @@ bool isColliding(glm::vec3 p, float d)
 
 bool isCollidingWithAll(glm::vec3 p, float d, glm::vec3 t)
 {
-    if (isColliding(p, d) || isCollidingWithEnemies(p, d, t) || isCollidingWithCoins(p, d))
+    if (isColliding(p, d) || isCollidingWithEnemies(p, d, t) || Coin::isCollidingWithCoins(p, d))
         return true;
     return false;
 }
-
-

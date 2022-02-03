@@ -2,6 +2,7 @@
 #include <glm/glm.hpp>
 #include "global.h"
 #include <random>
+#include "Entity.h"
 
 struct Enemy
 {

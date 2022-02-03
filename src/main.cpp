@@ -12,28 +12,12 @@
 #include "shader.h"
 #include "global.h"
 #include "Enemy.h"
+#include "Coin.h"
+#include "Helper.h"
 #include "Colliding.h"
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void processInput(GLFWwindow *window);
-
-glm::vec3 pos(float d)
-{
-    std::uniform_real_distribution<float> x(LEFTWALL + d, RIGHTWALL - d);
-    std::uniform_real_distribution<float> y(DOWNWALL + d, UPWALL - d);
-
-    return glm::vec3(x(gen), y(gen), Z);
-}
-
-struct Coin
-{
-    glm::vec3 coinPos;
-
-    unsigned int VBO, VAO;
-
-    Coin(glm::vec3 coinPos) :
-        coinPos(coinPos) { }
-};
 
 glm::vec3 color()
 {
@@ -182,54 +166,6 @@ std::vector<Enemy> generateEnemies()
     return enemies;
 }
 
-std::vector<Coin> generateCoins()
-{
-    std::vector<Coin> coins;
-    for (int i = 0; i < COINCOUNT; ++i)
-    {
-        float d = COINSIZE;
-        auto p = pos(d);
-
-        while (isCollidingWithAll(p, d))
-            p = pos(d);
-
-        float arr[] = {
-            p.x + d, p.y, Z, COINCOLORR, COINCOLORG, COINCOLORB,
-            p.x - d, p.y, Z, COINCOLORR, COINCOLORG, COINCOLORB,
-            p.x, p.y + d, Z, COINCOLORR, COINCOLORG, COINCOLORB,
-
-            p.x + d, p.y, Z, COINCOLORR, COINCOLORG, COINCOLORB,
-            p.x - d, p.y, Z, COINCOLORR, COINCOLORG, COINCOLORB,
-            p.x, p.y - d, Z, COINCOLORR, COINCOLORG, COINCOLORB
-        };
-
-        upCoins.push_back(p.y + d);
-        downCoins.push_back(p.y - d);
-        leftCoins.push_back(p.x - d);
-        rightCoins.push_back(p.x + d);
-
-        Coin coin(glm::vec3(p.x, p.y, Z));
-
-        glGenVertexArrays(1, &coin.VAO);
-        glGenBuffers(1, &coin.VBO);
-
-        glBindVertexArray(coin.VAO);
-        glBindBuffer(GL_ARRAY_BUFFER, coin.VBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(arr), arr, GL_STATIC_DRAW);
-
-        // Position attribute
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
-        glEnableVertexAttribArray(0);
-
-        // Color attribute
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3*sizeof(float)));
-        glEnableVertexAttribArray(1);
-
-        coins.push_back(coin);
-    }
-    return coins;
-}
-
 int main(int argc, char *argv[])
 {
 
@@ -347,7 +283,7 @@ int main(int argc, char *argv[])
     {
         auto obstacles = generateObstacles();
         auto enemies = generateEnemies();
-        auto coins = generateCoins();
+        Coin::generate();
 
         float obstacleArray[obstacles.size()];
 
@@ -355,7 +291,7 @@ int main(int argc, char *argv[])
             obstacleArray[i] = obstacles[i];
 
         auto p = pos(PLAYERSIZE);
-        while (isCollidingWithObstacles(p, PLAYERSIZE) || isCollidingWithEnemies(p, PLAYERSIZE * 9) || isCollidingWithCoins(p, PLAYERSIZE * 2))
+        while (isCollidingWithObstacles(p, PLAYERSIZE) || isCollidingWithEnemies(p, PLAYERSIZE * 9) || Coin::isCollidingWithCoins(p, PLAYERSIZE * 2))
             p = pos(PLAYERSIZE);
 
         playerPos = p;
@@ -443,23 +379,11 @@ int main(int argc, char *argv[])
                 gm = GameMode::LOST;
             }
 
-            if (isCollidingWithCoins(playerPos, PLAYERSIZE))
+            if (Coin::isCollidingWithCoins(playerPos, PLAYERSIZE, true))
             {
-                float d = PLAYERSIZE;
-                auto p = playerPos;
-                for (int i = 0; i < upCoins.size(); ++i)
-                    if (p.y + d >= downCoins[i] && p.y - d <= upCoins[i] && p.x + d >= leftCoins[i] && p.x - d <= rightCoins[i])
-                    {
-                        upCoins.erase(upCoins.begin() + i);
-                        downCoins.erase(downCoins.begin() + i);
-                        leftCoins.erase(leftCoins.begin() + i);
-                        rightCoins.erase(rightCoins.begin() + i);
-                        coins.erase(coins.begin() + i);
-                        coinsCollected++;
-                        totalScore += COINSCORE * ((isDark) ? 2 : 1);
-                        std::cout << "Score: " << totalScore << std::endl;
-                        break;
-                    }
+                coinsCollected++;
+                totalScore += COINSCORE * ((isDark) ? 2 : 1);
+                std::cout << "Score: " << totalScore << std::endl;
             }
 
             // Colliding with the door
@@ -503,11 +427,8 @@ int main(int argc, char *argv[])
 
             ourShader.setMat4("model", glm::mat4(1));
 
-            for (auto& coin: coins)
-            {
-                glBindVertexArray(coin.VAO);
-                glDrawArrays(GL_TRIANGLES, 0, 36);
-            }
+            for (auto& coin: Coin::coins)
+                coin.draw();
 
             glBindVertexArray(doorVAO);
             glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -542,11 +463,7 @@ int main(int argc, char *argv[])
         leftEnemies.clear();
         rightEnemies.clear();
 
-        upCoins.clear();
-        downCoins.clear();
-        leftCoins.clear();
-        rightCoins.clear();
-
+        Coin::clearCoins();
         coinsCollected = 0;
 
         ENEMYCOUNT += 1;

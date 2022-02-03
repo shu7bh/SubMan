@@ -31,8 +31,3 @@ std::vector<float> upEnemies;
 std::vector<float> downEnemies;
 std::vector<float> leftEnemies;
 std::vector<float> rightEnemies;
-
-std::vector<float> upCoins;
-std::vector<float> downCoins;
-std::vector<float> leftCoins;
-std::vector<float> rightCoins;
