@@ -9,10 +9,12 @@
 #include "Colliding.h"
 
 std::vector<Coin> Coin::coins;
+int Coin::coinsCollected = 0;
+int Coin::coinCount = 0;
 
 void Coin::generate()
 {
-    for (int i = 0; i < COINCOUNT; ++i)
+    for (int i = 0; i < coinCount; ++i)
     {
         float d = COINSIZE;
         auto p = pos(d);
@@ -20,14 +22,15 @@ void Coin::generate()
         while (isCollidingWithAll(p, d))
             p = pos(d);
 
-        float arr[] = {
-            p.x + d, p.y, Z, COINCOLORR, COINCOLORG, COINCOLORB,
-            p.x - d, p.y, Z, COINCOLORR, COINCOLORG, COINCOLORB,
-            p.x, p.y + d, Z, COINCOLORR, COINCOLORG, COINCOLORB,
+        float arr[] =
+        {
+            p.x + d, p.y, Z, R, G, B,
+            p.x - d, p.y, Z, R, G, B,
+            p.x, p.y + d, Z, R, G, B,
 
-            p.x + d, p.y, Z, COINCOLORR, COINCOLORG, COINCOLORB,
-            p.x - d, p.y, Z, COINCOLORR, COINCOLORG, COINCOLORB,
-            p.x, p.y - d, Z, COINCOLORR, COINCOLORG, COINCOLORB
+            p.x + d, p.y, Z, R, G, B,
+            p.x - d, p.y, Z, R, G, B,
+            p.x, p.y - d, Z, R, G, B
         };
 
         Coin coin(glm::vec3(p.x, p.y, Z), p.y + d, p.y - d, p.x + d, p.x - d);
@@ -47,17 +50,17 @@ void Coin::generate()
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3*sizeof(float)));
         glEnableVertexAttribArray(1);
 
-        Coin::coins.push_back(coin);
+        coins.push_back(coin);
     }
 }
 
 bool Coin::isCollidingWithCoins(const glm::vec3& pos, const float d, const bool delFlag)
 {
-    for (int i = 0; i < Coin::coins.size(); ++i)
-        if (Coin::coins[i].isColliding(pos, d))
+    for (int i = 0; i < coins.size(); ++i)
+        if (coins[i].isColliding(pos, d))
         {
             if (delFlag)
-                Coin::eraseCoin(i);
+                eraseCoin(i), incrementCoinsCollected();
 
             return true;
         }
@@ -75,13 +78,14 @@ bool Coin::isColliding(const glm::vec3& pos, const float d) const
 
 void Coin::eraseCoin(const int index)
 {
-    Coin::coins[index] = Coin::coins.back();
-    Coin::coins.pop_back();
+    coins[index] = coins.back();
+    coins.pop_back();
 }
 
 void Coin::clearCoins()
 {
-    Coin::coins.clear();
+    coins.clear();
+    coinsCollected = 0;
 }
 
 void Coin::draw()

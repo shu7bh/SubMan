@@ -1,11 +1,11 @@
 #include "Entity.h"
 
-unsigned int Entity::getVAO()
+const unsigned int Entity::getVAO() const
 {
     return VAO;
 }
 
-unsigned int Entity::getVBO()
+const unsigned int Entity::getVBO() const
 {
     return VBO;
 }
@@ -20,7 +20,7 @@ unsigned int* Entity::setVBO()
     return &VBO;
 }
 
-glm::vec3 Entity::getPosition()
+const glm::vec3 Entity::getPosition() const
 {
     return position;
 }

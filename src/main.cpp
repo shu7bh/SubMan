@@ -283,6 +283,7 @@ int main(int argc, char *argv[])
     {
         auto obstacles = generateObstacles();
         auto enemies = generateEnemies();
+        Coin::setCoinCount(Coin::getCoinCount() + 3);
         Coin::generate();
 
         float obstacleArray[obstacles.size()];
@@ -381,14 +382,13 @@ int main(int argc, char *argv[])
 
             if (Coin::isCollidingWithCoins(playerPos, PLAYERSIZE, true))
             {
-                coinsCollected++;
-                totalScore += COINSCORE * ((isDark) ? 2 : 1);
+                totalScore += Coin::COINSCORE * ((isDark) ? 2 : 1);
                 std::cout << "Score: " << totalScore << std::endl;
             }
 
             // Colliding with the door
             if (gm == GameMode::PLAYING)
-                if (coinsCollected == COINCOUNT && playerPos.x <= doorPos + DOORSIZE && playerPos.x >= doorPos - DOORSIZE && playerPos.y + PLAYERSIZE >= UPWALL - PLAYERSIZE)
+                if (Coin::allCoinsCollected() && playerPos.x <= doorPos + DOORSIZE && playerPos.x >= doorPos - DOORSIZE && playerPos.y + PLAYERSIZE >= UPWALL - PLAYERSIZE)
                 {
                     std::cout << "Level Completed" << std::endl << "Score: " << totalScore << std::endl;
                     gm = GameMode::WON;
@@ -464,11 +464,9 @@ int main(int argc, char *argv[])
         rightEnemies.clear();
 
         Coin::clearCoins();
-        coinsCollected = 0;
 
         ENEMYCOUNT += 1;
         WALLCOUNT += 1;
-        COINCOUNT += 1;
 
         model = glm::mat4(1);
         deltaTime = 0.0f;

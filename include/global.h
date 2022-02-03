@@ -46,10 +46,6 @@ constexpr float ENEMYCOLORR = 0.0f;
 constexpr float ENEMYCOLORG = 0.0f;
 constexpr float ENEMYCOLORB = 1.0f;
 
-constexpr float COINCOLORR = 0.0f;
-constexpr float COINCOLORG = 1.0f;
-constexpr float COINCOLORB = 1.0f;
-
 constexpr float DOORCOLORR = 1.0f;
 constexpr float DOORCOLORG = 1.0f;
 constexpr float DOORCOLORB = 0.5f;
@@ -61,10 +57,7 @@ constexpr float LEFTWALL = -RIGHTWALL;
 constexpr float WALLSIZE = 0.025f;
 constexpr float PLAYERSIZE = 0.02f;
 constexpr float ENEMYSIZE = 0.02f;
-constexpr float COINSIZE = 0.015f;
 constexpr float DOORSIZE = 0.08f;
-
-constexpr int COINSCORE = 10;
 
 extern float deltaTime;
 extern float lastFrame;
@@ -75,12 +68,9 @@ extern GameState gs;
 
 extern int ENEMYCOUNT;
 extern int WALLCOUNT;
-extern int COINCOUNT;
 
 extern int totalScore;
 extern bool isDark;
-
-extern int coinsCollected;
 
 extern std::random_device rand_dev;
 extern std::mt19937 gen;

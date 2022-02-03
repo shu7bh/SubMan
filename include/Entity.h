@@ -8,14 +8,14 @@ class Entity
     unsigned int VBO, VAO;
 
 public:
-    Entity();
+    Entity() {}
     Entity(const glm::vec3& position) : position(position) { }
 
-    unsigned int getVAO();
-    unsigned int getVBO();
+    const unsigned int getVAO() const;
+    const unsigned int getVBO() const;
 
     unsigned int* setVAO();
     unsigned int* setVBO();
 
-    glm::vec3 getPosition();
+    const glm::vec3 getPosition() const;
 };

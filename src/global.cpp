@@ -9,12 +9,9 @@ GameState gs = GameState::LEVEL1;
 
 int ENEMYCOUNT = 5;
 int WALLCOUNT = 20;
-int COINCOUNT = 3;
 
 int totalScore = 0;
 bool isDark = false;
-
-int coinsCollected = 0;
 
 std::random_device rand_dev;
 std::mt19937 gen(rand_dev());
