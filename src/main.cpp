@@ -207,39 +207,75 @@ struct Coin
 
 void Enemy::moveEnemy()
 {
+    static std::uniform_int_distribution<int> d(0, 4);
     bool moved = false;
-    int ct = 0;
 
-    while (!moved && gm == GameMode::PLAYING)
+    if (gm == GameMode::PLAYING)
     {
-        if (ct)
-        {
-            glm::vec3 tempPos;
-            auto p = glm::normalize(pos(0));
-            tempPos = glm::vec3(speed * deltaTime * p);
+        auto tempPos = speed * deltaTime * glm::normalize(playerPos - enemyPos);
 
-            if (!isColliding(enemyPos + tempPos, ENEMYSIZE))
-            {
-                this->model = glm::translate(this->model, tempPos);
-                enemyPos += tempPos;
-                moved = true;
-            }
-            break;
-        }
-        else
+        if (!isCollidingWithAll(enemyPos + tempPos, ENEMYSIZE, tempPos))
         {
-            auto p = playerPos - enemyPos;
-            p = glm::normalize(p);
-            auto tempPos = speed * deltaTime * p;
-
-            if (!isCollidingWithAll(enemyPos + tempPos, ENEMYSIZE, tempPos))
-            {
-                this->model = glm::translate(this->model, tempPos);
-                enemyPos += tempPos;
-                moved = true;
-            }
+            this->model = glm::translate(this->model, tempPos);
+            enemyPos += tempPos;
+            moved = true;
         }
-        ct++;
+
+        for (int ct = 0; !moved && ct < 10; ++ct)
+        {
+            switch (dir)
+            {
+            case Direction::UP:
+                tempPos = speed * deltaTime * glm::normalize(glm::vec3(0, 1, 0));
+                if (!isCollidingWithAll(enemyPos + tempPos, ENEMYSIZE, tempPos))
+                {
+                    this->model = glm::translate(this->model, tempPos);
+                    enemyPos += tempPos;
+                    moved = true;
+                }
+                break;
+
+            case Direction::DOWN:
+                tempPos = speed * deltaTime * glm::normalize(glm::vec3(0, -1, 0));
+                if (!isCollidingWithAll(enemyPos + tempPos, ENEMYSIZE, tempPos))
+                {
+                    this->model = glm::translate(this->model, tempPos);
+                    enemyPos += tempPos;
+                    moved = true;
+                }
+                break;
+
+            case Direction::LEFT:
+                tempPos = speed * deltaTime * glm::normalize(glm::vec3(-1, 0, 0));
+                if (!isCollidingWithAll(enemyPos + tempPos, ENEMYSIZE, tempPos))
+                {
+                    this->model = glm::translate(this->model, tempPos);
+                    enemyPos += tempPos;
+                    moved = true;
+                }
+                break;
+
+            case Direction::RIGHT:
+                tempPos = speed * deltaTime * glm::normalize(glm::vec3(1, 0, 0));
+                if (!isCollidingWithAll(enemyPos + tempPos, ENEMYSIZE, tempPos))
+                {
+                    this->model = glm::translate(this->model, tempPos);
+                    enemyPos += tempPos;
+                    moved = true;
+                }
+                break;
+            }
+
+            if (moved)
+                continue;
+
+            int a;
+            do
+                a = d(gen);
+            while (a == static_cast<int>(dir));
+
+            dir = static_cast<Direction>(a);
+        }
     }
 
     upEnemies.push_back(enemyPos.y + ENEMYSIZE);
@@ -906,8 +942,30 @@ void processInput(GLFWwindow *window)
                 else
                     speedy = 0;
 
-                lastPos = tempPos;
             }
+            else
+            {
+                if (tempPos.x * tempPos.x > 0)
+                    tempPos.y = 0;
+                else
+                    tempPos.x = 0;
+
+                if (!isColliding(playerPos + tempPos, PLAYERSIZE))
+                {
+                    playerPos += tempPos, model = glm::translate(model, tempPos);
+                    if (tempPos.x * lastPos.x > 0)
+                        speedx += 0.0002;
+                    else
+                        speedx = 0;
+
+                    if (tempPos.y * lastPos.y > 0)
+                        speedy += 0.0002;
+                    else
+                        speedy = 0;
+                }
+            }
+
+            lastPos = tempPos;
         }
         else
             lastPos = glm::vec3(0, 0, 0), speedx = speedy = 0.0f;
