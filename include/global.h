@@ -36,19 +36,26 @@ constexpr float DOWNFLOOR = -UPFLOOR;
 constexpr float RIGHTFLOOR = 1.0f;
 constexpr float LEFTFLOOR = -RIGHTFLOOR;
 
-constexpr float FLOORCOLOR = 0.17f;
-constexpr float WALLCOLOR = 0.30f;
+// dark blue floor color
+constexpr glm::vec3 FLOOR_COLOR = glm::vec3(0.0f, 0.0f, 0.3f);
+
+// darker blue wall color
+constexpr glm::vec3 WALL_COLOR = glm::vec3(0.0f, 0.0f, 0.1f);
+
 constexpr float PLAYERCOLORR = 1.0f;
 constexpr float PLAYERCOLORG = 1.0f;
 constexpr float PLAYERCOLORB = 0.0f;
 
-constexpr float ENEMYCOLORR = 0.0f;
+constexpr float ENEMYCOLORR = 1.0f;
 constexpr float ENEMYCOLORG = 0.0f;
-constexpr float ENEMYCOLORB = 1.0f;
+constexpr float ENEMYCOLORB = 0.0f;
 
 constexpr float DOORCOLORR = 1.0f;
-constexpr float DOORCOLORG = 1.0f;
+constexpr float DOORCOLORG = 0.0f;
 constexpr float DOORCOLORB = 0.5f;
+
+// orange colour obstacles
+constexpr glm::vec3 OBSTACLECOLOR = glm::vec3(1.0f, 0.5f, 0.0f);
 
 constexpr float UPWALL = 0.55f;
 constexpr float DOWNWALL = -UPWALL;
