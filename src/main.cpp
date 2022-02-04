@@ -14,6 +14,7 @@
 #include "Enemy.h"
 #include "Coin.h"
 #include "Helper.h"
+#include "texture.h"
 #include "Colliding.h"
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
@@ -279,6 +280,27 @@ int main(int argc, char *argv[])
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
+    std::vector<Texture> levels;
+
+    for (int i = 0; i < 3; ++i)
+    {
+        std::stringstream ss;
+        ss << "../fonts/level" << i + 1 << ".png";
+        levels.push_back(Texture(ss.str()));
+        levels[i].Init(0, 0.7f, 0.2, 0.1);
+    }
+
+    std::vector<Texture> digits;
+
+    for (int i = 0; i < 10; ++i)
+    {
+        std::stringstream ss;
+        ss << "../fonts/" << i << ".png";
+        digits.push_back(Texture(ss.str()));
+    }
+
+    digits[0].Init(0.2, 0.7f, 0.1, 0.1);
+
     while (static_cast<int>(gs) != static_cast<int>(GameState::END))
     {
         auto obstacles = generateObstacles();
@@ -401,6 +423,11 @@ int main(int argc, char *argv[])
 
             ourShader.use();
 
+            ourShader.setBool("isTexture", true);
+            levels[static_cast<int>(gs)].renderText();
+            //digits[0].renderText();
+            ourShader.setBool("isTexture", false);
+
             // Setting the player model
             ourShader.setMat4("model", model);
             ourShader.setBool("isDark", isDark);
@@ -465,7 +492,7 @@ int main(int argc, char *argv[])
 
         Coin::clearCoins();
 
-        ENEMYCOUNT += 1;
+        ENEMYCOUNT -= 1;
         WALLCOUNT += 1;
 
         model = glm::mat4(1);
